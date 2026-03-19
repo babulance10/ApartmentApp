@@ -8,16 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@tailwindcss/vite':
+        specifier: ^4
+        version: 4.2.2(vite@6.4.1(jiti@2.6.1)(lightningcss@1.32.0))
       axios:
         specifier: ^1.13.6
         version: 1.13.6
       lit:
         specifier: ^3.2.1
         version: 3.3.2
-    devDependencies:
-      '@tailwindcss/vite':
-        specifier: ^4
-        version: 4.2.2(vite@6.4.1(jiti@2.6.1)(lightningcss@1.32.0))
       tailwindcss:
         specifier: ^4
         version: 4.2.2
