@@ -1,0 +1,30 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node modules
+node_modules/
+dist/
+
+# Build outputs
+lit-frontend/dist/
+
+# macOS
+.DS_Store
+
+# Excel/Word files (raw data)
+*.xlsx
+*.csv
+*.docx
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+
+# Prisma generated
+backend/node_modules/

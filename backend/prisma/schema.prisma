@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  TENANT
+}
+
+enum BillStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  role      Role     @default(TENANT)
+  isOwnerTenant Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedFlats          FlatOwnership[]
+  tenancies           FlatTenancy[]
+  maintenanceRequests MaintenanceRequest[]
+  contributions       FlatContribution[]
+}
+
+model Apartment {
+  id         String  @id @default(cuid())
+  name       String
+  address    String
+  city       String
+  upiNumber  String?
+  upiName    String?
+
+  flats           Flat[]
+  expenses        Expense[]
+  waterPurchases  WaterPurchase[]
+}
+
+model Flat {
+  id          String    @id @default(cuid())
+  flatNumber  String
+  floor       Int
+  apartmentId String
+
+  apartment   Apartment @relation(fields: [apartmentId], references: [id])
+  ownerships  FlatOwnership[]
+  tenancies   FlatTenancy[]
+  bills       MonthlyBill[]
+  waterReadings WaterMeterReading[]
+  maintenanceRequests MaintenanceRequest[]
+  contributions FlatContribution[]
+
+  @@unique([flatNumber, apartmentId])
+}
+
+model FlatOwnership {
+  id        String    @id @default(cuid())
+  flatId    String
+  userId    String
+  fromDate  DateTime
+  toDate    DateTime?
+  isActive  Boolean   @default(true)
+
+  flat      Flat @relation(fields: [flatId], references: [id])
+  user      User @relation(fields: [userId], references: [id])
+}
+
+model FlatTenancy {
+  id        String    @id @default(cuid())
+  flatId    String
+  userId    String
+  fromDate  DateTime
+  toDate    DateTime?
+  isActive  Boolean   @default(true)
+
+  flat      Flat @relation(fields: [flatId], references: [id])
+  user      User @relation(fields: [userId], references: [id])
+}
+
+model WaterMeterReading {
+  id               String   @id @default(cuid())
+  flatId           String
+  month            Int
+  year             Int
+  previousReading  Float
+  currentReading   Float
+  litersConsumed   Float
+  pricePerLiter    Float    @default(0.088)
+  waterAmount      Float
+  readingDate      DateTime @default(now())
+
+  flat             Flat @relation(fields: [flatId], references: [id])
+
+  @@unique([flatId, month, year])
+}
+
+model MonthlyBill {
+  id                String     @id @default(cuid())
+  flatId            String
+  month             Int
+  year              Int
+  maintenanceAmount Float      @default(2000)
+  waterAmount       Float      @default(0)
+  previousDue       Float      @default(0)
+  totalAmount       Float
+  paidAmount        Float      @default(0)
+  status            BillStatus @default(PENDING)
+  generatedAt       DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  flat              Flat @relation(fields: [flatId], references: [id])
+  payments          Payment[]
+
+  @@unique([flatId, month, year])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  billId          String
+  amount          Float
+  paymentDate     DateTime @default(now())
+  paymentMethod   String?
+  transactionRef  String?
+  notes           String?
+  bill            MonthlyBill @relation(fields: [billId], references: [id])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  apartmentId String
+  month       Int
+  year        Int
+  category    String
+  description String
+  amount      Float
+  expenseDate DateTime
+  createdAt   DateTime @default(now())
+
+  apartment   Apartment @relation(fields: [apartmentId], references: [id])
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(cuid())
+  flatId      String
+  userId      String
+  title       String
+  description String
+  status      MaintenanceStatus   @default(OPEN)
+  priority    MaintenancePriority @default(MEDIUM)
+  resolvedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  flat        Flat @relation(fields: [flatId], references: [id])
+  user        User @relation(fields: [userId], references: [id])
+}
+
+model WaterPurchase {
+  id             String    @id @default(cuid())
+  apartmentId    String
+  month          Int
+  year           Int
+  srNo           Int
+  capacityLiters Int       @default(10000)
+  tokenNo        String?
+  bookedOn       DateTime
+  deliveredOn    DateTime
+  amountPaid     Float
+  vehicleNo      String?
+  createdAt      DateTime  @default(now())
+
+  apartment      Apartment @relation(fields: [apartmentId], references: [id])
+}
+
+enum ContributionType {
+  WATER
+  MAINTENANCE
+  OTHER
+}
+
+model FlatContribution {
+  id               String           @id @default(cuid())
+  flatId           String
+  userId           String
+  month            Int
+  year             Int
+  type             ContributionType
+  amount           Float
+  description      String?
+  appliedToBillId  String?
+  createdAt        DateTime         @default(now())
+
+  flat             Flat             @relation(fields: [flatId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
+}

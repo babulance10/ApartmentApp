@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Shell: sidebar + main ── */
+.psa-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.psa-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  color: #e2e8f0;
+  transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  border-right: 1px solid rgba(255,255,255,0.04);
+  position: sticky;
+  top: 0;
+}
+
+.psa-sidebar-nav::-webkit-scrollbar { width: 4px; }
+.psa-sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.psa-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+.psa-nav-item {
+  transition: all 180ms ease;
+}
+
+.psa-main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--color-background);
+}
+
+.psa-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 40px 48px;
+}
+
+@media (max-width: 1024px) {
+  .psa-content { padding: 24px 20px 32px; }
+}
+
+/* ── Scrollbar (main area) ── */
+.psa-main::-webkit-scrollbar { width: 6px; height: 6px; }
+.psa-main::-webkit-scrollbar-track { background: transparent; }
+.psa-main::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.psa-main::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Animations ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 1s linear infinite; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fadeIn { animation: fadeIn 300ms ease-out; }
+
+/* ── Transitions ── */
+.transition-all { transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+.transition-colors { transition: color 150ms, background-color 150ms, border-color 150ms; }
+
+/* ── Premium utility ── */
+.glass-card {
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.6);
+}
