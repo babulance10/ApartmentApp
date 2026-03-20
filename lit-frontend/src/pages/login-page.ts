@@ -20,9 +20,10 @@ export class LoginPage extends LitElement {
     try {
       const { data } = await api.post('/auth/login', { email: this.email, password: this.password });
       setAuth(data.access_token, data.user);
-      if (data.user.role === 'TENANT') window.location.hash = '#/tenant';
-      else if (data.user.role === 'OWNER') window.location.hash = '#/owner';
-      else window.location.hash = '#/admin';
+      const roles = data.user.roles || [];
+      if (roles.includes('ADMIN')) window.location.hash = '#/admin';
+      else if (roles.includes('OWNER')) window.location.hash = '#/owner';
+      else window.location.hash = '#/tenant';
     } catch (err: any) {
       this.error = err.response?.data?.message || 'Invalid email or password';
     } finally {

@@ -26,6 +26,7 @@ import './pages/admin/admin-payments.js';
 import './pages/admin/admin-contributions.js';
 import './pages/admin/admin-expenses.js';
 import './pages/admin/admin-maintenance.js';
+import './pages/admin/admin-events.js';
 import './pages/tenant/tenant-bills.js';
 import './pages/tenant/tenant-payments.js';
 import './pages/tenant/tenant-maintenance.js';
@@ -46,6 +47,7 @@ router
   .register('/admin/contributions', () => html`<admin-contributions></admin-contributions>`, true)
   .register('/admin/expenses', () => html`<admin-expenses></admin-expenses>`, true)
   .register('/admin/maintenance', () => html`<admin-maintenance></admin-maintenance>`, true)
+  .register('/admin/events', () => html`<admin-events></admin-events>`, true)
   .register('/tenant', () => html`<tenant-bills></tenant-bills>`, true)
   .register('/tenant/payments', () => html`<tenant-payments></tenant-payments>`, true)
   .register('/tenant/maintenance', () => html`<tenant-maintenance></tenant-maintenance>`, true)

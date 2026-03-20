@@ -116,7 +116,7 @@ export class AdminContributions extends LitElement {
             </psa-select>
             <psa-select label="Resident" .value=${this.form.userId} @value-changed=${(e: CustomEvent) => this._uf('userId', e.detail)}>
               <option value="">Select resident...</option>
-              ${this.users.filter(u => u.role !== 'ADMIN').map(u => html`<option value=${u.id}>${u.name} (${u.email})</option>`)}
+              ${this.users.filter(u => !(u.roles || []).includes('ADMIN')).map(u => html`<option value=${u.id}>${u.name} (${u.email})</option>`)}
             </psa-select>
             <div class="grid grid-cols-2 gap-3">
               <psa-select label="Month" .value=${String(this.form.month)} @value-changed=${(e: CustomEvent) => this._uf('month', +e.detail)}>

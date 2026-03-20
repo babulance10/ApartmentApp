@@ -14,7 +14,7 @@ export class FlatsController {
 
   @Get('my')
   findMyFlats(@Request() req: any) {
-    return this.flatsService.findByUser(req.user.id, req.user.role);
+    return this.flatsService.findByUser(req.user.id, req.user.roles);
   }
 
   @Get(':id')

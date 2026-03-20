@@ -9,14 +9,14 @@ export class UsersService {
 
   async findAll() {
     return this.prisma.user.findMany({
-      select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, roles: true, createdAt: true },
     });
   }
 
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, roles: true, createdAt: true },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -30,7 +30,7 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
-        id: true, name: true, email: true, phone: true, role: true,
+        id: true, name: true, email: true, phone: true, roles: true,
         tenancies: {
           where: { isActive: true },
           include: { flat: { include: { apartment: true } } },
@@ -55,7 +55,7 @@ export class UsersService {
     return user;
   }
 
-  async create(dto: { name: string; email: string; phone?: string; password: string; role?: Role }) {
+  async create(dto: { name: string; email: string; phone?: string; password: string; roles?: Role[] }) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already in use');
     const hashed = await bcrypt.hash(dto.password, 10);
@@ -66,11 +66,11 @@ export class UsersService {
     return result;
   }
 
-  async update(id: string, dto: { name?: string; phone?: string; role?: Role }) {
+  async update(id: string, dto: { name?: string; phone?: string; roles?: Role[] }) {
     return this.prisma.user.update({
       where: { id },
       data: dto,
-      select: { id: true, name: true, email: true, phone: true, role: true },
+      select: { id: true, name: true, email: true, phone: true, roles: true },
     });
   }
 
@@ -90,11 +90,4 @@ export class UsersService {
     return { message: 'Password updated successfully' };
   }
 
-  async setOwnerTenant(id: string, isOwnerTenant: boolean) {
-    return this.prisma.user.update({
-      where: { id },
-      data: { isOwnerTenant },
-      select: { id: true, name: true, email: true, role: true, isOwnerTenant: true },
-    });
-  }
 }

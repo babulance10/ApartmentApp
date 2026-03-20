@@ -18,9 +18,13 @@ export function clearAuth() {
 }
 
 export function isAdmin(user: any) {
-  return user?.role === 'ADMIN';
+  return user?.roles?.includes('ADMIN');
 }
 
 export function isOwner(user: any) {
-  return user?.role === 'OWNER' || user?.role === 'ADMIN';
+  return user?.roles?.includes('OWNER') || user?.roles?.includes('ADMIN');
+}
+
+export function hasRole(user: any, role: string) {
+  return user?.roles?.includes(role);
 }

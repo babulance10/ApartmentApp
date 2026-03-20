@@ -37,8 +37,7 @@ model User {
   email     String   @unique
   phone     String?
   password  String
-  role      Role     @default(TENANT)
-  isOwnerTenant Boolean @default(false)
+  roles     Role[]   @default([TENANT])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -46,6 +45,7 @@ model User {
   tenancies           FlatTenancy[]
   maintenanceRequests MaintenanceRequest[]
   contributions       FlatContribution[]
+  eventCollections    EventCollection[]
 }
 
 model Apartment {
@@ -59,6 +59,7 @@ model Apartment {
   flats           Flat[]
   expenses        Expense[]
   waterPurchases  WaterPurchase[]
+  events          Event[]
 }
 
 model Flat {
@@ -74,6 +75,7 @@ model Flat {
   waterReadings WaterMeterReading[]
   maintenanceRequests MaintenanceRequest[]
   contributions FlatContribution[]
+  eventCollections EventCollection[]
 
   @@unique([flatNumber, apartmentId])
 }
@@ -201,6 +203,57 @@ enum ContributionType {
   WATER
   MAINTENANCE
   OTHER
+}
+
+enum EventStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Event {
+  id            String      @id @default(cuid())
+  apartmentId   String
+  name          String
+  description   String?
+  targetAmount  Float       @default(0)
+  status        EventStatus @default(PLANNING)
+  startDate     DateTime?
+  endDate       DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  apartment     Apartment   @relation(fields: [apartmentId], references: [id])
+  collections   EventCollection[]
+  expenses      EventExpense[]
+}
+
+model EventCollection {
+  id          String   @id @default(cuid())
+  eventId     String
+  flatId      String
+  userId      String?
+  amount      Float
+  paidDate    DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  event       Event    @relation(fields: [eventId], references: [id])
+  flat        Flat     @relation(fields: [flatId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model EventExpense {
+  id          String   @id @default(cuid())
+  eventId     String
+  category    String
+  description String
+  amount      Float
+  expenseDate DateTime
+  createdAt   DateTime @default(now())
+
+  event       Event    @relation(fields: [eventId], references: [id])
 }
 
 model FlatContribution {

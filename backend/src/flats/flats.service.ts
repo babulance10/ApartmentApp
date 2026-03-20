@@ -29,8 +29,8 @@ export class FlatsService {
     return flat;
   }
 
-  async findByUser(userId: string, role: string) {
-    if (role === 'OWNER') {
+  async findByUser(userId: string, roles: string[]) {
+    if (roles?.includes('OWNER')) {
       return this.prisma.flat.findMany({
         where: { ownerships: { some: { userId, isActive: true } } },
         include: {

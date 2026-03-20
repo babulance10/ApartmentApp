@@ -23,12 +23,12 @@ export class UsersController {
   }
 
   @Post()
-  create(@Body() dto: { name: string; email: string; phone?: string; password: string; role?: any }) {
+  create(@Body() dto: { name: string; email: string; phone?: string; password: string; roles?: any[] }) {
     return this.usersService.create(dto);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: { name?: string; phone?: string; role?: any }) {
+  update(@Param('id') id: string, @Body() dto: { name?: string; phone?: string; roles?: any[] }) {
     return this.usersService.update(id, dto);
   }
 
@@ -42,8 +42,4 @@ export class UsersController {
     return this.usersService.changeMyPassword(req.user.id, dto.oldPassword, dto.newPassword);
   }
 
-  @Patch(':id/owner-tenant')
-  setOwnerTenant(@Param('id') id: string, @Body() dto: { isOwnerTenant: boolean }) {
-    return this.usersService.setOwnerTenant(id, dto.isOwnerTenant);
-  }
 }

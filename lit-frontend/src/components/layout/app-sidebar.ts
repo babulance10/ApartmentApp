@@ -22,6 +22,7 @@ const adminNav: NavItem[] = [
   { href: '#/admin/contributions', label: 'Contributions', icon: iconHandCoins, group: 'Finance' },
   { href: '#/admin/expenses', label: 'Expenses', icon: iconBarChart3, group: 'Finance' },
   { href: '#/admin/maintenance', label: 'Maintenance', icon: iconWrench, group: 'Operations' },
+  { href: '#/admin/events', label: 'Events', icon: iconHandCoins, group: 'Operations' },
 ];
 
 const ownerNav: NavItem[] = [
@@ -125,8 +126,9 @@ export class AppSidebar extends LitElement {
   }
 
   render() {
-    const nav = this.user?.role === 'ADMIN' ? adminNav
-      : this.user?.role === 'OWNER' ? ownerNav
+    const roles = this.user?.roles || [];
+    const nav = roles.includes('ADMIN') ? adminNav
+      : roles.includes('OWNER') ? ownerNav
       : tenantNav;
     const c = this.collapsed;
     const hasGroups = nav.some(n => n.group);

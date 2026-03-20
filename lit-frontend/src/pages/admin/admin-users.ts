@@ -9,7 +9,7 @@ export class AdminUsers extends LitElement {
   @state() private loading = true;
   @state() private modal = false;
   @state() private editUser: any = null;
-  @state() private form = { name: '', email: '', phone: '', password: '', role: 'TENANT' };
+  @state() private form = { name: '', email: '', phone: '', password: '', roles: ['TENANT'] as string[] };
   @state() private saving = false;
   @state() private resetModal: any = null;
   @state() private newPw = '';
@@ -20,14 +20,14 @@ export class AdminUsers extends LitElement {
 
   private async _load() { const { data } = await api.get('/users'); this.users = data; this.loading = false; }
 
-  private _openCreate() { this.editUser = null; this.form = { name: '', email: '', phone: '', password: '', role: 'TENANT' }; this.modal = true; }
-  private _openEdit(u: any) { this.editUser = u; this.form = { name: u.name, email: u.email, phone: u.phone || '', password: '', role: u.role }; this.modal = true; }
+  private _openCreate() { this.editUser = null; this.form = { name: '', email: '', phone: '', password: '', roles: ['TENANT'] }; this.modal = true; }
+  private _openEdit(u: any) { this.editUser = u; this.form = { name: u.name, email: u.email, phone: u.phone || '', password: '', roles: [...(u.roles || [])] }; this.modal = true; }
 
   private async _handleSave() {
     this.saving = true;
     try {
       if (this.editUser) {
-        await api.patch(`/users/${this.editUser.id}`, { name: this.form.name, phone: this.form.phone, role: this.form.role });
+        await api.patch(`/users/${this.editUser.id}`, { name: this.form.name, phone: this.form.phone, roles: this.form.roles });
         if (this.form.password) await api.patch(`/users/${this.editUser.id}/password`, { password: this.form.password });
       } else { await api.post('/users', this.form); }
       await this._load(); this.modal = false;
@@ -35,8 +35,12 @@ export class AdminUsers extends LitElement {
     this.saving = false;
   }
 
-  private async _handleToggleOwnerTenant(u: any) {
-    await api.patch(`/users/${u.id}/owner-tenant`, { isOwnerTenant: !u.isOwnerTenant }); await this._load();
+  private _toggleRole(role: string) {
+    const roles = [...this.form.roles];
+    const idx = roles.indexOf(role);
+    if (idx >= 0) { if (roles.length > 1) roles.splice(idx, 1); }
+    else roles.push(role);
+    this.form = { ...this.form, roles };
   }
 
   private async _handleAdminReset() {
@@ -73,8 +77,7 @@ export class AdminUsers extends LitElement {
                   <th class="text-left px-6 py-3 font-medium text-gray-500">Name</th>
                   <th class="text-left px-6 py-3 font-medium text-gray-500">Email</th>
                   <th class="text-left px-6 py-3 font-medium text-gray-500">Phone</th>
-                  <th class="text-left px-6 py-3 font-medium text-gray-500">Role</th>
-                  <th class="text-left px-6 py-3 font-medium text-gray-500">Owner+Tenant</th>
+                  <th class="text-left px-6 py-3 font-medium text-gray-500">Roles</th>
                   <th class="text-left px-6 py-3 font-medium text-gray-500">Actions</th>
                 </tr>
               </thead>
@@ -85,14 +88,10 @@ export class AdminUsers extends LitElement {
                       <td class="px-6 py-3 font-medium text-gray-900">${u.name}</td>
                       <td class="px-6 py-3 text-gray-600">${u.email}</td>
                       <td class="px-6 py-3 text-gray-600">${u.phone || '—'}</td>
-                      <td class="px-6 py-3"><span class="text-xs font-medium px-2 py-0.5 rounded-full ${this._roleColor(u.role)}">${u.role}</span></td>
                       <td class="px-6 py-3">
-                        ${u.role === 'OWNER' ? html`
-                          <button @click=${() => this._handleToggleOwnerTenant(u)}
-                            class="text-xs font-medium px-2 py-0.5 rounded-full cursor-pointer transition border-none ${u.isOwnerTenant ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
-                            ${u.isOwnerTenant ? 'Yes' : 'No'}
-                          </button>
-                        ` : html`<span class="text-gray-300">—</span>`}
+                        <div class="flex flex-wrap gap-1">
+                          ${(u.roles || []).map((r: string) => html`<span class="text-xs font-medium px-2 py-0.5 rounded-full ${this._roleColor(r)}">${r}</span>`)}
+                        </div>
                       </td>
                       <td class="px-6 py-3">
                         <div class="flex items-center gap-2">
@@ -114,9 +113,24 @@ export class AdminUsers extends LitElement {
             ${!this.editUser ? html`<psa-input label="Email" type="email" .value=${this.form.email} @value-changed=${(e: CustomEvent) => this._uf('email', e.detail)}></psa-input>` : ''}
             <psa-input label="Phone" .value=${this.form.phone} @value-changed=${(e: CustomEvent) => this._uf('phone', e.detail)}></psa-input>
             <psa-input label=${this.editUser ? 'New Password (leave blank to keep)' : 'Password'} type="password" .value=${this.form.password} @value-changed=${(e: CustomEvent) => this._uf('password', e.detail)}></psa-input>
-            <psa-select label="Role" .value=${this.form.role} @value-changed=${(e: CustomEvent) => this._uf('role', e.detail)}>
-              <option value="TENANT">Tenant</option><option value="OWNER">Owner</option><option value="ADMIN">Admin</option>
-            </psa-select>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Roles (select one or more)</label>
+              <div class="flex flex-wrap gap-2">
+                ${['ADMIN', 'OWNER', 'TENANT'].map(role => html`
+                  <button type="button"
+                    @click=${() => this._toggleRole(role)}
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer border-2 transition-all
+                      ${this.form.roles.includes(role)
+                        ? role === 'ADMIN' ? 'bg-purple-100 text-purple-700 border-purple-400'
+                          : role === 'OWNER' ? 'bg-blue-100 text-blue-700 border-blue-400'
+                          : 'bg-green-100 text-green-700 border-green-400'
+                        : 'bg-gray-50 text-gray-400 border-gray-200 hover:border-gray-300'}
+                    ">
+                    ${this.form.roles.includes(role) ? '✓ ' : ''}${role}
+                  </button>
+                `)}
+              </div>
+            </div>
             <div class="flex gap-2 justify-end pt-2">
               <psa-button variant="secondary" @click=${() => this.modal = false}>Cancel</psa-button>
               <psa-button .loading=${this.saving} @click=${this._handleSave}>Save</psa-button>

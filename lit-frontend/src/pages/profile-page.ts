@@ -64,7 +64,7 @@ export class ProfilePage extends LitElement {
           </div>
           <div class="px-6 py-4">
             <div class="space-y-4">
-              <div class="flex items-center gap-2 text-xs font-medium px-2 py-0.5 rounded-full w-fit bg-purple-100 text-purple-700">${this.user?.role}</div>
+              <div class="flex items-center gap-2">${(this.user?.roles || []).map((r: string) => html`<span class="text-xs font-medium px-2 py-0.5 rounded-full ${r === 'ADMIN' ? 'bg-purple-100 text-purple-700' : r === 'OWNER' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">${r}</span>`)}</div>
               <psa-input label="Full Name" .value=${this.profileForm.name} @value-changed=${(e: CustomEvent) => this.profileForm = { ...this.profileForm, name: e.detail }}></psa-input>
               <psa-input label="Email" .value=${this.user?.email || ''} disabled></psa-input>
               <psa-input label="Phone Number" .value=${this.profileForm.phone} @value-changed=${(e: CustomEvent) => this.profileForm = { ...this.profileForm, phone: e.detail }} placeholder="+91 XXXXXXXXXX"></psa-input>

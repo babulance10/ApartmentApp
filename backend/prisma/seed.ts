@@ -11,13 +11,13 @@ async function main() {
   const admin = await prisma.user.upsert({
     where: { email: 'admin@psa.com' },
     update: {},
-    create: { name: 'PSA Admin', email: 'admin@psa.com', password: adminPassword, role: Role.ADMIN, phone: '7093991333' },
+    create: { name: 'PSA Admin', email: 'admin@psa.com', password: adminPassword, roles: [Role.ADMIN], phone: '7093991333' },
   });
 
   const owner101 = await prisma.user.upsert({
     where: { email: 'owner101@psa.com' },
     update: {},
-    create: { name: 'Owner Flat 101', email: 'owner101@psa.com', password: ownerPassword, role: Role.OWNER, phone: '9000000101' },
+    create: { name: 'Owner Flat 101', email: 'owner101@psa.com', password: ownerPassword, roles: [Role.OWNER], phone: '9000000101' },
   });
 
   const apartment = await prisma.apartment.upsert({
@@ -56,7 +56,7 @@ async function main() {
         name: `Resident ${f.flatNumber}`,
         email: tenantEmail,
         password: tenantPassword,
-        role: Role.TENANT,
+        roles: [Role.TENANT],
       },
     });
 
