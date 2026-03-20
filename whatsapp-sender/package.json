@@ -1,0 +1,14 @@
+{
+  "name": "psa-whatsapp-sender",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "send": "node send-whatsapp.js",
+    "install-browser": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.41.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.0"
+  }
+}

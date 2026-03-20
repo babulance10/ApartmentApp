@@ -28,3 +28,7 @@ npm-debug.log*
 
 # Prisma generated
 backend/node_modules/
+
+# WhatsApp sender session
+whatsapp-sender/.whatsapp-session/
+whatsapp-sender/.env

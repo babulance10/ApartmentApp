@@ -1,6 +1,27 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request, Headers, UnauthorizedException } from '@nestjs/common';
 import { BillsService } from './bills.service';
+import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+// Public endpoint — no JWT, protected by CRON_SECRET header for cron-job.org
+@Controller('bills')
+export class BillsCronController {
+  constructor(private billsService: BillsService, private config: ConfigService) {}
+
+  @Post('cron-trigger')
+  async cronTrigger(
+    @Headers('x-cron-secret') secret: string,
+    @Body() body: { apartmentId?: string; month?: number; year?: number },
+  ) {
+    const expected = this.config.get<string>('CRON_SECRET', '');
+    if (!expected || secret !== expected) throw new UnauthorizedException('Invalid cron secret');
+    const now = new Date();
+    const month = body.month ?? now.getMonth() + 1;
+    const year = body.year ?? now.getFullYear();
+    const apartmentId = body.apartmentId ?? this.config.get<string>('APARTMENT_ID', 'psa-main');
+    return this.billsService.bulkSendEmails(apartmentId, month, year);
+  }
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('bills')
