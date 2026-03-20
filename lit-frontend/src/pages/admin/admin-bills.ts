@@ -178,48 +178,53 @@ export class AdminBills extends LitElement {
         </div>
 
         <!-- ── Filter Bar + Summary ── -->
-        <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-6">
-          <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
-            <!-- Filters -->
-            <div class="flex items-center gap-3">
-              <div class="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-1.5">
-                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Period</span>
+        <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-4 mb-6">
+          <!-- Filters row -->
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 rounded-xl px-3 py-1.5">Period</span>
+            <psa-select .value=${String(this.month)} @value-changed=${(e: CustomEvent) => this.month = +e.detail}>
+              ${MONTHS.map((m, i) => html`<option value=${i + 1}>${m}</option>`)}
+            </psa-select>
+            <psa-select .value=${String(this.year)} @value-changed=${(e: CustomEvent) => this.year = +e.detail}>
+              ${this._years.map(y => html`<option value=${y}>${y}</option>`)}
+            </psa-select>
+            <span class="text-sm text-gray-400">${this.bills.length} flats</span>
+          </div>
+          <!-- Summary pills -->
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+            <div class="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
+              <div class="w-2 h-2 rounded-full bg-blue-500 shrink-0"></div>
+              <div>
+                <p class="text-[10px] font-medium text-blue-500 uppercase">Total Due</p>
+                <p class="text-sm font-bold text-blue-700">${formatCurrency(this._totalDue)}</p>
               </div>
-              <psa-select .value=${String(this.month)} @value-changed=${(e: CustomEvent) => this.month = +e.detail}>
-                ${MONTHS.map((m, i) => html`<option value=${i + 1}>${m}</option>`)}
-              </psa-select>
-              <psa-select .value=${String(this.year)} @value-changed=${(e: CustomEvent) => this.year = +e.detail}>
-                ${this._years.map(y => html`<option value=${y}>${y}</option>`)}
-              </psa-select>
-              <span class="text-sm text-gray-400 ml-1">${this.bills.length} flats</span>
             </div>
-            <!-- Summary pills -->
-            <div class="flex items-center gap-3 flex-wrap">
-              <div class="flex items-center gap-2 bg-blue-50 rounded-xl px-4 py-2">
-                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
-                <span class="text-xs font-medium text-blue-600">Total Due</span>
-                <span class="text-sm font-bold text-blue-700">${formatCurrency(this._totalDue)}</span>
+            <div class="flex items-center gap-2 bg-green-50 rounded-xl px-3 py-2">
+              <div class="w-2 h-2 rounded-full bg-green-500 shrink-0"></div>
+              <div>
+                <p class="text-[10px] font-medium text-green-500 uppercase">Collected</p>
+                <p class="text-sm font-bold text-green-700">${formatCurrency(this._totalPaid)}</p>
               </div>
-              <div class="flex items-center gap-2 bg-green-50 rounded-xl px-4 py-2">
-                <div class="w-2 h-2 rounded-full bg-green-500"></div>
-                <span class="text-xs font-medium text-green-600">Collected</span>
-                <span class="text-sm font-bold text-green-700">${formatCurrency(this._totalPaid)}</span>
+            </div>
+            <div class="flex items-center gap-2 bg-red-50 rounded-xl px-3 py-2">
+              <div class="w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
+              <div>
+                <p class="text-[10px] font-medium text-red-500 uppercase">Pending</p>
+                <p class="text-sm font-bold text-red-700">${formatCurrency(this._totalPending)}</p>
               </div>
-              <div class="flex items-center gap-2 bg-red-50 rounded-xl px-4 py-2">
-                <div class="w-2 h-2 rounded-full bg-red-500"></div>
-                <span class="text-xs font-medium text-red-600">Pending</span>
-                <span class="text-sm font-bold text-red-700">${formatCurrency(this._totalPending)}</span>
-              </div>
-              <div class="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2">
-                <span class="text-xs font-medium text-gray-500">Paid</span>
-                <span class="text-sm font-bold text-gray-700">${this._paidCount}/${this.bills.length}</span>
+            </div>
+            <div class="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+              <div class="w-2 h-2 rounded-full bg-gray-400 shrink-0"></div>
+              <div>
+                <p class="text-[10px] font-medium text-gray-400 uppercase">Paid Flats</p>
+                <p class="text-sm font-bold text-gray-700">${this._paidCount}/${this.bills.length}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- ── Table ── -->
-        <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+        <!-- ── Desktop Table (hidden on mobile) ── -->
+        <div class="hidden sm:block bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-xs">
               <thead>
@@ -316,6 +321,86 @@ export class AdminBills extends LitElement {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <!-- ── Mobile Cards (shown only on mobile) ── -->
+        <div class="sm:hidden space-y-3">
+          ${this.loading ? html`
+            <div class="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+              <div class="flex flex-col items-center gap-3">
+                <div class="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                <span class="text-sm text-gray-400">Loading bills...</span>
+              </div>
+            </div>` :
+            this.bills.length === 0 ? html`
+            <div class="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+              <div class="flex flex-col items-center gap-3">
+                <div class="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center">${iconZap('w-7 h-7 text-gray-300')}</div>
+                <p class="text-gray-500 font-medium text-sm">No bills for ${monthName(this.month)} ${this.year}</p>
+                <p class="text-xs text-gray-400">Tap "Generate Bills" to create them</p>
+              </div>
+            </div>` :
+            this.bills.map((bill) => {
+              const balance = bill.totalAmount - bill.paidAmount;
+              const statusCls = bill.status === 'PAID' ? 'bg-green-100 text-green-700' : bill.status === 'PARTIAL' ? 'bg-amber-100 text-amber-700' : 'bg-red-50 text-red-600';
+              const dotCls = bill.status === 'PAID' ? 'bg-green-500' : bill.status === 'PARTIAL' ? 'bg-amber-500' : 'bg-red-500';
+              return html`
+              <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <!-- Card Header -->
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                      ${bill.flat?.flatNumber}
+                    </div>
+                    <div>
+                      <p class="font-bold text-gray-900 text-sm">Flat ${bill.flat?.flatNumber}</p>
+                      <p class="text-xs text-gray-400">${bill.flat?.tenancies?.[0]?.user?.name || 'No tenant'}</p>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${statusCls}">
+                    <span class="w-1.5 h-1.5 rounded-full ${dotCls}"></span>
+                    ${bill.status}
+                  </span>
+                </div>
+                <!-- Amounts grid -->
+                <div class="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+                  <div class="px-3 py-2.5 text-center">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-wide">Total</p>
+                    <p class="text-sm font-bold text-gray-900">${formatCurrency(bill.totalAmount)}</p>
+                  </div>
+                  <div class="px-3 py-2.5 text-center">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-wide">Paid</p>
+                    <p class="text-sm font-semibold ${bill.paidAmount > 0 ? 'text-green-600' : 'text-gray-300'}">${bill.paidAmount > 0 ? formatCurrency(bill.paidAmount) : '—'}</p>
+                  </div>
+                  <div class="px-3 py-2.5 text-center">
+                    <p class="text-[10px] text-gray-400 uppercase tracking-wide">Balance</p>
+                    <p class="text-sm font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}">${balance > 0 ? formatCurrency(balance) : '₹0'}</p>
+                  </div>
+                </div>
+                <!-- Bill breakdown -->
+                <div class="px-4 py-2.5 flex gap-4 text-xs text-gray-500 border-b border-gray-100">
+                  <span>Maint: <span class="font-medium text-gray-700">${formatCurrency(bill.maintenanceAmount)}</span></span>
+                  ${bill.waterAmount > 0 ? html`<span>Water: <span class="font-medium text-gray-700">${formatCurrency(bill.waterAmount)}</span></span>` : ''}
+                  ${bill.previousDue !== 0 ? html`<span>Prev: <span class="font-medium ${bill.previousDue < 0 ? 'text-green-600' : 'text-orange-600'}">${bill.previousDue < 0 ? `CR ${formatCurrency(Math.abs(bill.previousDue))}` : formatCurrency(bill.previousDue)}</span></span>` : ''}
+                </div>
+                <!-- Actions -->
+                <div class="flex items-center gap-2 px-4 py-2.5">
+                  ${bill.status !== 'PAID' ? html`
+                    <button @click=${() => { this.payModal = { open: true, bill }; this.payAmount = String(balance); }}
+                      class="flex-1 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer border-none transition-all">
+                      Record Payment
+                    </button>` : html`
+                    <div class="flex-1 py-2 text-xs font-bold text-green-600 text-center">✓ Paid</div>`}
+                  <button @click=${() => { this.editForm = { maintenanceAmount: String(bill.maintenanceAmount), waterAmount: String(bill.waterAmount), previousDue: String(bill.previousDue) }; this.editModal = { open: true, bill }; }}
+                    class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl cursor-pointer bg-white border border-gray-200 transition-all">${iconEdit2('w-4 h-4')}</button>
+                  <button @click=${() => this._sendWhatsApp(bill)}
+                    class="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-xl cursor-pointer bg-white border border-gray-200 transition-all">${iconMessageCircle('w-4 h-4')}</button>
+                  <button @click=${() => this._sendEmail(bill)}
+                    class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl cursor-pointer bg-white border border-gray-200 transition-all">${iconMail('w-4 h-4')}</button>
+                </div>
+              </div>`;
+            })
+          }
         </div>
 
         <!-- ── Edit Bill Modal ── -->
