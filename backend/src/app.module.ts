@@ -12,6 +12,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { WaterPurchasesModule } from './water-purchases/water-purchases.module';
 import { ContributionsModule } from './contributions/contributions.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ContributionsModule } from './contributions/contributions.module';
     MaintenanceModule,
     WaterPurchasesModule,
     ContributionsModule,
+    WhatsappModule,
   ],
 })
 export class AppModule {}

@@ -22,9 +22,53 @@ export class AdminBills extends LitElement {
   @state() private editForm = { maintenanceAmount: '', waterAmount: '', previousDue: '' };
   @state() private bulkSending = false;
   @state() private bulkDropdown = false;
+  @state() private waStatus: 'disconnected' | 'qr_pending' | 'connecting' | 'ready' = 'disconnected';
+  @state() private waQr: string | null = null;
+  @state() private waConnecting = false;
+  @state() private waModal = false;
 
   createRenderRoot() { return this; }
-  connectedCallback() { super.connectedCallback(); this._load(); }
+  connectedCallback() { super.connectedCallback(); this._load(); this._pollWaStatus(); }
+
+  private _waPollTimer: any = null;
+  private async _pollWaStatus() {
+    try {
+      const { data } = await api.get('/whatsapp/status');
+      this.waStatus = data.status;
+      this.waQr = data.qr || null;
+    } catch { this.waStatus = 'disconnected'; }
+    this._waPollTimer = setTimeout(() => this._pollWaStatus(), this.waStatus === 'qr_pending' ? 3000 : 15000);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    clearTimeout(this._waPollTimer);
+  }
+
+  private async _connectWhatsApp() {
+    this.waConnecting = true;
+    this.waModal = true;
+    try {
+      await api.post('/whatsapp/connect');
+      this._pollWaStatus();
+    } catch { }
+    this.waConnecting = false;
+  }
+
+  private async _disconnectWhatsApp() {
+    await api.delete('/whatsapp/disconnect');
+    this.waStatus = 'disconnected';
+    this.waQr = null;
+  }
+
+  private async _bulkSendWhatsAppBackend() {
+    this.bulkSending = true; this.bulkDropdown = false;
+    try {
+      const { data } = await api.post('/bills/bulk-send-whatsapp', { apartmentId: APARTMENT_ID, month: this.month, year: this.year });
+      alert(`WhatsApp sent to ${data.sent?.length ?? 0} flat(s): ${data.sent?.join(', ') || 'none'}\n${data.failed?.length ? `Failed: ${data.failed.join(', ')}` : ''}${data.skipped?.length ? `\nNo phone: ${data.skipped.join(', ')}` : ''}`);
+    } catch (e: any) { alert(e.response?.data?.message || 'Error sending WhatsApp messages.'); }
+    this.bulkSending = false;
+  }
 
   private async _load() {
     this.loading = true;
@@ -136,6 +180,28 @@ export class AdminBills extends LitElement {
     return html`
       <div class="animate-fadeIn">
 
+        <!-- ── WhatsApp Status Banner ── -->
+        ${this.waStatus === 'ready' ? html`
+          <div class="flex items-center gap-3 bg-green-50 border border-green-200 rounded-2xl px-4 py-3 mb-4">
+            <div class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
+            <span class="text-sm font-medium text-green-700 flex-1">WhatsApp connected — bulk send available</span>
+            <button @click=${this._disconnectWhatsApp} class="text-xs text-green-600 underline cursor-pointer bg-transparent border-none">Disconnect</button>
+          </div>
+        ` : this.waStatus === 'qr_pending' ? html`
+          <div class="bg-white border border-gray-200 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row items-center gap-4">
+            <div class="flex flex-col items-center gap-2">
+              <p class="text-sm font-semibold text-gray-800">Scan QR with WhatsApp</p>
+              <p class="text-xs text-gray-400 text-center">Open WhatsApp → Settings → Linked Devices → Link a Device</p>
+              ${this.waQr ? html`<img src=${this.waQr} alt="WhatsApp QR" style="width:200px;height:200px;border-radius:12px">` : html`<div class="w-48 h-48 bg-gray-100 rounded-xl animate-pulse"></div>`}
+            </div>
+          </div>
+        ` : this.waStatus === 'connecting' ? html`
+          <div class="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3 mb-4">
+            <div class="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
+            <span class="text-sm text-blue-700">Connecting to WhatsApp...</span>
+          </div>
+        ` : ''}
+
         <!-- ── Header ── -->
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -157,10 +223,17 @@ export class AdminBills extends LitElement {
                   <div class="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-100">
                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Send to unpaid flats</p>
                   </div>
-                  <button @click=${this._bulkSendWhatsApp} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 cursor-pointer bg-transparent border-none transition-colors">
-                    <div class="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">${iconMessageCircle('w-4 h-4 text-green-600')}</div>
-                    <div class="text-left"><p class="font-medium text-gray-800">WhatsApp</p><p class="text-xs text-gray-400">Open chat for each flat</p></div>
-                  </button>
+                  ${this.waStatus === 'ready' ? html`
+                    <button @click=${this._bulkSendWhatsAppBackend} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 cursor-pointer bg-transparent border-none transition-colors">
+                      <div class="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">${iconMessageCircle('w-4 h-4 text-green-600')}</div>
+                      <div class="text-left"><p class="font-medium text-gray-800">WhatsApp (Auto)</p><p class="text-xs text-gray-400">Send all via connected session</p></div>
+                    </button>
+                  ` : html`
+                    <button @click=${() => { this.bulkDropdown = false; this._connectWhatsApp(); }} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-green-50 cursor-pointer bg-transparent border-none transition-colors">
+                      <div class="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">${iconMessageCircle('w-4 h-4 text-green-600')}</div>
+                      <div class="text-left"><p class="font-medium text-gray-800">WhatsApp (Auto)</p><p class="text-xs text-gray-400">Connect first, then send all</p></div>
+                    </button>
+                  `}
                   <button @click=${this._bulkSendEmail} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer bg-transparent border-none border-t border-gray-100 transition-colors">
                     <div class="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">${iconMail('w-4 h-4 text-blue-600')}</div>
                     <div class="text-left"><p class="font-medium text-gray-800">Email</p><p class="text-xs text-gray-400">Send all via SMTP</p></div>
