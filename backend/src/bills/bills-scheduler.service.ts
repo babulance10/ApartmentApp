@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { BillsService } from './bills.service';
 
 @Injectable()
 export class BillsSchedulerService {
   private readonly logger = new Logger(BillsSchedulerService.name);
-  private readonly APARTMENT_ID = 'psa-main';
+  private readonly APARTMENT_ID: string;
 
-  constructor(private billsService: BillsService) {}
+  constructor(private billsService: BillsService, private config: ConfigService) {
+    this.APARTMENT_ID = this.config.get<string>('APARTMENT_ID', 'psa-main');
+  }
 
   // Runs on the 5th of every month at 9:00 AM IST (3:30 AM UTC)
   @Cron('30 3 5 * *', { timeZone: 'Asia/Kolkata' })
