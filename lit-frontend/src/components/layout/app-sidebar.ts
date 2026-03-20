@@ -59,9 +59,11 @@ export class AppSidebar extends LitElement {
 
   private _onHashChange = () => {
     this.currentPath = window.location.hash;
-    // Close mobile sidebar on navigation
-    this.classList.remove('mobile-open');
-    document.getElementById('psa-overlay')?.style.setProperty('display', 'none');
+    // Close mobile sidebar on navigation — target the <aside> inside this component
+    const aside = this.querySelector('.psa-sidebar') || this.shadowRoot?.querySelector('.psa-sidebar');
+    if (aside) aside.classList.remove('mobile-open');
+    const overlay = document.getElementById('psa-overlay');
+    if (overlay) overlay.style.display = 'none';
   };
 
   private _toggleCollapse() {
@@ -149,7 +151,7 @@ export class AppSidebar extends LitElement {
             </div>
           `}
           <button @click=${this._toggleCollapse}
-            class="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 cursor-pointer bg-transparent border-none ${c ? 'mt-3' : ''}"
+            class="psa-collapse-btn p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 cursor-pointer bg-transparent border-none ${c ? 'mt-3' : ''}"
             title=${c ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             ${c ? iconPanelLeftOpen('w-4 h-4') : iconPanelLeftClose('w-4 h-4')}
