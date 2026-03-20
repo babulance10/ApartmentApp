@@ -224,7 +224,7 @@ export class AdminBills extends LitElement {
         </div>
 
         <!-- ── Desktop Table (hidden on mobile) ── -->
-        <div class="hidden sm:block bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+        <div class="mobile-hidden bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-xs">
               <thead>
@@ -324,7 +324,7 @@ export class AdminBills extends LitElement {
         </div>
 
         <!-- ── Mobile Cards (shown only on mobile) ── -->
-        <div class="sm:hidden space-y-3">
+        <div class="mobile-only" style="display:none;flex-direction:column;gap:12px">
           ${this.loading ? html`
             <div class="bg-white rounded-2xl border border-gray-200 p-8 text-center">
               <div class="flex flex-col items-center gap-3">
