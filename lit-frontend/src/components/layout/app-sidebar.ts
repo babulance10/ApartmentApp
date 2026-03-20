@@ -57,7 +57,12 @@ export class AppSidebar extends LitElement {
     window.removeEventListener('hashchange', this._onHashChange);
   }
 
-  private _onHashChange = () => { this.currentPath = window.location.hash; };
+  private _onHashChange = () => {
+    this.currentPath = window.location.hash;
+    // Close mobile sidebar on navigation
+    this.classList.remove('mobile-open');
+    document.getElementById('psa-overlay')?.style.setProperty('display', 'none');
+  };
 
   private _toggleCollapse() {
     this.collapsed = !this.collapsed;

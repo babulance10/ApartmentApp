@@ -40,6 +40,74 @@ body {
   border-right: 1px solid rgba(255,255,255,0.04);
   position: sticky;
   top: 0;
+  z-index: 40;
+}
+
+/* Mobile: sidebar becomes a fixed overlay drawer */
+@media (max-width: 767px) {
+  .psa-sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    width: 260px !important;
+    transform: translateX(-100%);
+    transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
+  }
+  .psa-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .psa-overlay {
+    display: block !important;
+  }
+  .psa-topbar {
+    display: flex !important;
+  }
+  .psa-main {
+    padding-top: 56px;
+  }
+}
+
+.psa-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 49;
+  backdrop-filter: blur(2px);
+}
+
+.psa-topbar {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 48;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.psa-topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.psa-hamburger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  cursor: pointer;
+  color: white;
+  flex-shrink: 0;
 }
 
 .psa-sidebar-nav::-webkit-scrollbar { width: 4px; }
@@ -65,6 +133,10 @@ body {
 
 @media (max-width: 1024px) {
   .psa-content { padding: 24px 20px 32px; }
+}
+
+@media (max-width: 767px) {
+  .psa-content { padding: 16px 14px 32px; }
 }
 
 /* ── Scrollbar (main area) ── */
