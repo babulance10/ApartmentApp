@@ -100,11 +100,6 @@ export class LoginPage extends LitElement {
               <p><strong>Default Password:</strong> <code class="bg-white px-1 py-0.5 rounded text-blue-700 font-mono">tenant123</code></p>
               <p class="text-amber-700 font-medium">⚠️ After first login, please update your password and phone number in My Profile</p>
             </div>
-            
-            <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
-              <p class="font-medium text-gray-600">Admin Demo:</p>
-              <p>admin@psa.com / admin123</p>
-            </div>
           </div>
         </div>
       </div>

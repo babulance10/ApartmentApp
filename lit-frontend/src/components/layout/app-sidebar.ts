@@ -27,7 +27,6 @@ const adminNav: NavItem[] = [
 
 const ownerNav: NavItem[] = [
   { href: '#/owner', label: 'My Flats & Tenants', icon: iconHome },
-  { href: '#/owner/water-meter', label: 'Water Meter', icon: iconDroplets },
   { href: '#/admin/contributions', label: 'Contributions', icon: iconHandCoins },
   { href: '#/profile', label: 'My Profile', icon: iconUserCircle },
 ];
