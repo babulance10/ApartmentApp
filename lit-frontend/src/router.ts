@@ -24,9 +24,40 @@ class HashRouter {
     this._resolve();
   }
 
+  private _homeForRoles(roles: string[]): string {
+    if (roles.includes('ADMIN')) return '#/admin';
+    if (roles.includes('OWNER')) return '#/owner';
+    if (roles.includes('VIEWER')) return '#/admin';
+    if (roles.includes('WATER_MANAGER')) return '#/admin/water-purchases';
+    if (roles.includes('TENANT')) return '#/tenant';
+    return '#/login';
+  }
+
+  private _isRouteAllowed(hash: string, roles: string[]): boolean {
+    if (roles.includes('ADMIN')) return true;
+    if (hash === '/profile') return true;
+    if (roles.includes('VIEWER') && (hash === '/admin' || hash === '/admin/events')) return true;
+    if (roles.includes('WATER_MANAGER') && hash.startsWith('/admin/water-purchases')) return true;
+    if (roles.includes('OWNER') && (hash.startsWith('/owner') || hash === '/admin/contributions')) return true;
+    if (roles.includes('TENANT') && hash.startsWith('/tenant')) return true;
+    return false;
+  }
+
   private _resolve() {
     if (!this.outlet) return;
-    const hash = window.location.hash.slice(1) || '/login';
+    const rawHash = window.location.hash.slice(1);
+
+    // Redirect logged-in users away from login / empty URL to their home
+    if (!rawHash || rawHash === '/' || rawHash === '/login') {
+      const token = getToken();
+      if (token) {
+        const roles: string[] = getUser()?.roles || [];
+        window.location.hash = this._homeForRoles(roles);
+        return;
+      }
+    }
+
+    const hash = rawHash || '/login';
 
     // Exact match first
     let route = this.routes.find(r => r.path === hash);
@@ -48,56 +79,13 @@ class HashRouter {
       // Auth guard
       if (!getToken()) { window.location.hash = '#/login'; return; }
 
-      // Role guard
+      // Role guard — unified check across all roles
       const user = getUser();
       const roles: string[] = user?.roles || [];
-      const isAdmin = roles.includes('ADMIN');
-      const isOwner = roles.includes('OWNER');
-      const isTenant = roles.includes('TENANT');
-      const isViewer = roles.includes('VIEWER');
-      const isWaterManager = roles.includes('WATER_MANAGER');
 
-      // VIEWER: only dashboard + events
-      if (isViewer && !isAdmin) {
-        if (hash.startsWith('/admin') && hash !== '/admin' && hash !== '/admin/events') {
-          window.location.hash = '#/admin'; return;
-        }
-        if (hash.startsWith('/owner') || hash.startsWith('/tenant')) {
-          window.location.hash = '#/admin'; return;
-        }
-      }
-
-      // WATER_MANAGER: only water-purchases + profile
-      if (isWaterManager && !isAdmin && !isViewer) {
-        if (hash.startsWith('/admin') && hash !== '/admin/water-purchases') {
-          window.location.hash = '#/admin/water-purchases'; return;
-        }
-        if (hash.startsWith('/owner') || hash.startsWith('/tenant')) {
-          window.location.hash = '#/admin/water-purchases'; return;
-        }
-      }
-
-      // OWNER: owner pages + contributions
-      if (isOwner && !isAdmin && !isViewer) {
-        const ownerAllowed = hash.startsWith('/owner') || hash === '/admin/contributions' || hash === '/profile';
-        if (hash.startsWith('/admin') && hash !== '/admin/contributions') {
-          window.location.hash = '#/owner'; return;
-        }
-        if (hash.startsWith('/tenant')) {
-          window.location.hash = '#/owner'; return;
-        }
-      }
-
-      // TENANT: tenant pages only
-      if (isTenant && !isAdmin && !isOwner && !isViewer && !isWaterManager) {
-        if (hash.startsWith('/admin') || hash.startsWith('/owner')) {
-          window.location.hash = '#/tenant'; return;
-        }
-      }
-
-      // Catch-all: non-authenticated role accessing protected routes
-      if (!isAdmin && !isOwner && !isTenant && !isViewer && !isWaterManager) {
-        window.location.hash = '#/login'; return;
+      if (!this._isRouteAllowed(hash, roles)) {
+        window.location.hash = this._homeForRoles(roles);
+        return;
       }
 
       render(html`
