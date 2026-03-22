@@ -20,15 +20,12 @@ export class TenantPayments extends LitElement {
         const now = new Date();
         const currentMonth = now.getMonth() + 1;
         const currentYear = now.getFullYear();
-        const billsRes = await api.get(`/bills?flatId=${tenancy.flat.id}`);
+        // Only fetch current month's bill
+        const billsRes = await api.get(`/bills?flatId=${tenancy.flat.id}&month=${currentMonth}&year=${currentYear}`);
         const bills = billsRes.data;
-        // Only show bills up to current month (exclude future)
-        const relevantBills = bills.filter((b: any) =>
-          b.year < currentYear || (b.year === currentYear && b.month <= currentMonth)
-        );
-        if (relevantBills.length) {
+        if (bills.length) {
           const allPayments = await Promise.all(
-            relevantBills.map((b: any) => api.get(`/payments?billId=${b.id}`).then((r: any) => r.data.map((p: any) => ({ ...p, bill: b }))))
+            bills.map((b: any) => api.get(`/payments?billId=${b.id}`).then((r: any) => r.data.map((p: any) => ({ ...p, bill: b }))))
           );
           this.payments = allPayments.flat().sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
         }

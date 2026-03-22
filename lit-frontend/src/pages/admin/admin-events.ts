@@ -1,6 +1,7 @@
 import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { iconPlus, iconEdit2, iconTrash2 } from '../../lib/icons.js';
+import { getUser } from '../../lib/auth.js';
 import api from '../../lib/api.js';
 
 @customElement('admin-events')
@@ -17,6 +18,11 @@ export class AdminEvents extends LitElement {
   @state() private expForm = { category: '', description: '', amount: 0, expenseDate: '' };
   @state() private saving = false;
   @state() private editEvent: any = null;
+
+  private get _isReadOnly() {
+    const roles: string[] = getUser()?.roles || [];
+    return roles.includes('VIEWER') && !roles.includes('ADMIN');
+  }
 
   createRenderRoot() { return this; }
 
@@ -166,7 +172,7 @@ export class AdminEvents extends LitElement {
             <h1 class="text-2xl font-bold text-gray-900">Events</h1>
             <p class="text-gray-500 text-sm mt-1">Manage event collections & expenses (Ganesh Chaturthi, Annual Day, etc.)</p>
           </div>
-          <psa-button @click=${this._openCreateEvent}>${iconPlus('w-4 h-4')} New Event</psa-button>
+          ${!this._isReadOnly ? html`<psa-button @click=${this._openCreateEvent}>${iconPlus('w-4 h-4')} New Event</psa-button>` : ''}
         </div>
 
         <!-- Event Cards Grid -->
@@ -199,6 +205,7 @@ export class AdminEvents extends LitElement {
                       <p class="text-sm font-bold text-red-700">${this._fmt(spent)}</p>
                     </div>
                   </div>
+                  ${!this._isReadOnly ? html`
                   <div class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
                     <button @click=${(evt: Event) => { evt.stopPropagation(); this._openEditEvent(e); }} class="text-blue-600 text-xs cursor-pointer bg-transparent border-none hover:underline">Edit</button>
                     <select class="text-xs border border-gray-200 rounded px-1 py-0.5 cursor-pointer" @change=${(evt: Event) => { evt.stopPropagation(); this._updateStatus(e.id, (evt.target as HTMLSelectElement).value); }} .value=${e.status}>
@@ -208,7 +215,7 @@ export class AdminEvents extends LitElement {
                       <option value="CANCELLED">Cancelled</option>
                     </select>
                     <button @click=${(evt: Event) => { evt.stopPropagation(); this._deleteEvent(e.id); }} class="text-red-500 text-xs cursor-pointer bg-transparent border-none hover:underline ml-auto">Delete</button>
-                  </div>
+                  </div>` : html`<div class="mt-3 pt-3 border-t border-gray-100"><span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">${e.status}</span></div>`}
                 </div>
               `;
             })}
@@ -230,7 +237,7 @@ export class AdminEvents extends LitElement {
             <div class="mb-6">
               <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-semibold text-gray-700">Collections (${ev.collections.length})</h3>
-                <button @click=${this._openAddCollection} class="text-xs text-blue-600 hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1">${iconPlus('w-3 h-3')} Add Collection</button>
+                ${!this._isReadOnly ? html`<button @click=${this._openAddCollection} class="text-xs text-blue-600 hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1">${iconPlus('w-3 h-3')} Add Collection</button>` : ''}
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -251,7 +258,7 @@ export class AdminEvents extends LitElement {
                           <td class="px-4 py-2 text-green-700 font-semibold">${this._fmt(c.amount)}</td>
                           <td class="px-4 py-2 text-gray-500">${c.paidDate ? new Date(c.paidDate).toLocaleDateString() : '—'}</td>
                           <td class="px-4 py-2 text-gray-500">${c.notes || '—'}</td>
-                          <td class="px-4 py-2"><button @click=${() => this._removeCollection(c.id)} class="text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none">${iconTrash2('w-3.5 h-3.5')}</button></td>
+                          <td class="px-4 py-2">${!this._isReadOnly ? html`<button @click=${() => this._removeCollection(c.id)} class="text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none">${iconTrash2('w-3.5 h-3.5')}</button>` : ''}</td>
                         </tr>
                       `)}
                   </tbody>
@@ -263,7 +270,7 @@ export class AdminEvents extends LitElement {
             <div>
               <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-semibold text-gray-700">Expenses (${ev.expenses.length})</h3>
-                <button @click=${this._openAddExpense} class="text-xs text-blue-600 hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1">${iconPlus('w-3 h-3')} Add Expense</button>
+                ${!this._isReadOnly ? html`<button @click=${this._openAddExpense} class="text-xs text-blue-600 hover:underline cursor-pointer bg-transparent border-none flex items-center gap-1">${iconPlus('w-3 h-3')} Add Expense</button>` : ''}
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -284,7 +291,7 @@ export class AdminEvents extends LitElement {
                           <td class="px-4 py-2">${e.description}</td>
                           <td class="px-4 py-2 text-red-700 font-semibold">${this._fmt(e.amount)}</td>
                           <td class="px-4 py-2 text-gray-500">${new Date(e.expenseDate).toLocaleDateString()}</td>
-                          <td class="px-4 py-2"><button @click=${() => this._removeExpense(e.id)} class="text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none">${iconTrash2('w-3.5 h-3.5')}</button></td>
+                          <td class="px-4 py-2">${!this._isReadOnly ? html`<button @click=${() => this._removeExpense(e.id)} class="text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none">${iconTrash2('w-3.5 h-3.5')}</button>` : ''}</td>
                         </tr>
                       `)}
                   </tbody>

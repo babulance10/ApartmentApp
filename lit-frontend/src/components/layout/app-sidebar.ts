@@ -138,12 +138,26 @@ export class AppSidebar extends LitElement {
   }
 
   render() {
-    const roles = this.user?.roles || [];
-    const nav = roles.includes('ADMIN') ? adminNav
-      : roles.includes('VIEWER') ? viewerNav
-      : roles.includes('WATER_MANAGER') ? waterManagerNav
-      : roles.includes('OWNER') ? ownerNav
-      : tenantNav;
+    const roles: string[] = this.user?.roles || [];
+
+    // Build combined nav from all roles; ADMIN overrides everything
+    let nav: NavItem[];
+    if (roles.includes('ADMIN')) {
+      nav = adminNav;
+    } else {
+      const seen = new Set<string>();
+      const combined: NavItem[] = [];
+      const addItems = (items: NavItem[]) => {
+        items.forEach(item => {
+          if (!seen.has(item.href)) { seen.add(item.href); combined.push(item); }
+        });
+      };
+      if (roles.includes('OWNER')) addItems(ownerNav);
+      if (roles.includes('VIEWER')) addItems(viewerNav);
+      if (roles.includes('WATER_MANAGER')) addItems(waterManagerNav);
+      if (roles.includes('TENANT')) addItems(tenantNav);
+      nav = combined.length > 0 ? combined : tenantNav;
+    }
     const c = this.collapsed;
     const hasGroups = nav.some(n => n.group);
 
