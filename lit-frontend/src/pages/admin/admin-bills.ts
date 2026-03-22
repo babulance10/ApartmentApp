@@ -17,6 +17,7 @@ export class AdminBills extends LitElement {
   @state() private payAmount = '';
   @state() private payMethod = 'UPI';
   @state() private payRef = '';
+  @state() private payDate = new Date().toISOString().slice(0, 10);
   @state() private saving = false;
   @state() private editModal: any = null;
   @state() private editForm = { maintenanceAmount: '', waterAmount: '', previousDue: '' };
@@ -90,6 +91,23 @@ export class AdminBills extends LitElement {
     this.waSentFlats = new Set([...this.waSentFlats, bill.flat?.flatNumber]);
   }
 
+  private async _sendAllWhatsApp() {
+    const unpaid = this.bills.filter(b => b.status !== 'PAID' && b.flat?.tenancies?.[0]?.user?.phone);
+    for (const bill of unpaid) {
+      this._sendWaBulk(bill);
+      await new Promise(r => setTimeout(r, 800));
+    }
+  }
+
+  private async _recalculateAll() {
+    if (!confirm('This will recalculate and fix statuses of ALL bills based on actual payments recorded. Continue?')) return;
+    try {
+      const { data } = await api.post('/bills/recalculate-all', {});
+      alert(`Done! Fixed ${data.fixed} of ${data.total} bills.`);
+      await this._load();
+    } catch (e: any) { alert('Error: ' + (e.response?.data?.message || e.message)); }
+  }
+
   private async _bulkSendEmail() {
     this.bulkDropdown = false;
     if (!confirm('Make sure SMTP is configured in backend .env.\n\nContinue?')) return;
@@ -112,8 +130,8 @@ export class AdminBills extends LitElement {
     if (!this.payModal) return;
     this.saving = true;
     try {
-      await api.post('/payments', { billId: this.payModal.bill.id, amount: parseFloat(this.payAmount), paymentMethod: this.payMethod, transactionRef: this.payRef, paymentDate: new Date().toISOString() });
-      await this._load(); this.payModal = null; this.payAmount = ''; this.payRef = '';
+      await api.post('/payments', { billId: this.payModal.bill.id, amount: parseFloat(this.payAmount), paymentMethod: this.payMethod, transactionRef: this.payRef, paymentDate: new Date(this.payDate).toISOString() });
+      await this._load(); this.payModal = null; this.payAmount = ''; this.payRef = ''; this.payDate = new Date().toISOString().slice(0, 10);
     } catch (e: any) { alert(e.response?.data?.message || 'Error recording payment'); }
     this.saving = false;
   }
@@ -175,6 +193,11 @@ export class AdminBills extends LitElement {
                 <div class="fixed inset-0 z-10" @click=${() => this.bulkDropdown = false}></div>
               ` : ''}
             </div>
+            <!-- Recalculate -->
+            <button @click=${this._recalculateAll} title="Fix bill statuses based on actual payments"
+              class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-amber-50 hover:border-amber-300 shadow-sm cursor-pointer border-none transition-all">
+              ${iconZap('w-4 h-4 text-amber-500')} Fix Statuses
+            </button>
             <!-- Generate -->
             <button @click=${this._generateBills} ?disabled=${this.generating}
               class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer border-none transition-all">
@@ -441,6 +464,11 @@ export class AdminBills extends LitElement {
               <option value="UPI">UPI</option><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank Transfer</option><option value="CHEQUE">Cheque</option>
             </psa-select>
             <psa-input label="Transaction Ref (optional)" .value=${this.payRef} @value-changed=${(e: CustomEvent) => this.payRef = e.detail} placeholder="UPI txn ID / ref number"></psa-input>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+              <input type="date" .value=${this.payDate} @input=${(e: Event) => this.payDate = (e.target as HTMLInputElement).value}
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
             <div class="flex gap-2 justify-end pt-2">
               <psa-button variant="secondary" @click=${() => this.payModal = null}>Cancel</psa-button>
               <psa-button .loading=${this.saving} .disabled=${!this.payAmount} @click=${this._handlePayment}>Save Payment</psa-button>
@@ -484,7 +512,12 @@ export class AdminBills extends LitElement {
                 `;
               })}
             </div>
-            <div class="flex justify-end pt-2">
+            <div class="flex items-center justify-between pt-2">
+              <button @click=${() => this._sendAllWhatsApp()}
+                class="text-sm font-semibold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl cursor-pointer border-none shadow-sm transition-all"
+                ?disabled=${this.bills.filter(b => b.status !== 'PAID' && b.flat?.tenancies?.[0]?.user?.phone).length === 0}>
+                Send All (${this.bills.filter(b => b.status !== 'PAID' && b.flat?.tenancies?.[0]?.user?.phone).length} with phone)
+              </button>
               <psa-button variant="secondary" @click=${() => this.waBulkModal = false}>Close</psa-button>
             </div>
           </div>

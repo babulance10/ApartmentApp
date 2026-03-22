@@ -52,6 +52,7 @@ router
   .register('/tenant/payments', () => html`<tenant-payments></tenant-payments>`, true)
   .register('/tenant/maintenance', () => html`<tenant-maintenance></tenant-maintenance>`, true)
   .register('/owner', () => html`<owner-dashboard></owner-dashboard>`, true)
+  .register('/owner/water-meter', () => html`<admin-water-meter></admin-water-meter>`, true)
   .register('/profile', () => html`<profile-page></profile-page>`, true);
 
 // Start

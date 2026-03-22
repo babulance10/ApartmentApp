@@ -56,7 +56,10 @@ export class AdminUsers extends LitElement {
   private _uf(key: string, val: string) { this.form = { ...this.form, [key]: val }; }
 
   private _roleColor(role: string) {
-    return role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : role === 'OWNER' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
+    return role === 'ADMIN' ? 'bg-purple-100 text-purple-700'
+      : role === 'OWNER' ? 'bg-blue-100 text-blue-700'
+      : role === 'VIEWER' ? 'bg-orange-100 text-orange-700'
+      : 'bg-green-100 text-green-700';
   }
 
   render() {
@@ -116,13 +119,14 @@ export class AdminUsers extends LitElement {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Roles (select one or more)</label>
               <div class="flex flex-wrap gap-2">
-                ${['ADMIN', 'OWNER', 'TENANT'].map(role => html`
+                ${['ADMIN', 'OWNER', 'TENANT', 'VIEWER'].map(role => html`
                   <button type="button"
                     @click=${() => this._toggleRole(role)}
                     class="px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer border-2 transition-all
                       ${this.form.roles.includes(role)
                         ? role === 'ADMIN' ? 'bg-purple-100 text-purple-700 border-purple-400'
                           : role === 'OWNER' ? 'bg-blue-100 text-blue-700 border-blue-400'
+                          : role === 'VIEWER' ? 'bg-orange-100 text-orange-700 border-orange-400'
                           : 'bg-green-100 text-green-700 border-green-400'
                         : 'bg-gray-50 text-gray-400 border-gray-200 hover:border-gray-300'}
                     ">

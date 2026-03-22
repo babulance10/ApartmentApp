@@ -126,6 +126,22 @@ export class BillsService {
     return this.prisma.monthlyBill.update({ where: { id }, data: { paidAmount, status } });
   }
 
+  async recalculateAllStatuses() {
+    const bills = await this.prisma.monthlyBill.findMany({ include: { payments: true } });
+    let fixed = 0;
+    for (const bill of bills) {
+      const paidAmount = bill.payments.reduce((s, p) => s + p.amount, 0);
+      let status: BillStatus = BillStatus.PENDING;
+      if (paidAmount >= bill.totalAmount && bill.totalAmount > 0) status = BillStatus.PAID;
+      else if (paidAmount > 0) status = BillStatus.PARTIAL;
+      if (bill.paidAmount !== paidAmount || bill.status !== status) {
+        await this.prisma.monthlyBill.update({ where: { id: bill.id }, data: { paidAmount, status } });
+        fixed++;
+      }
+    }
+    return { total: bills.length, fixed };
+  }
+
   async getAllTimeTotals(apartmentId: string) {
     // Authoritative total from Spend Details sheet (Jun 2020 – Mar 2026)
     const SPEND_DETAILS_TOTAL_RECEIVED = 1651504;

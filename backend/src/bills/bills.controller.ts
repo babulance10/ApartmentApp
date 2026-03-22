@@ -2,7 +2,6 @@ import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request, H
 import { BillsService } from './bills.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 // Public endpoint — no JWT, protected by CRON_SECRET header for cron-job.org
 @Controller('bills')
@@ -27,7 +26,7 @@ export class BillsCronController {
 @UseGuards(JwtAuthGuard)
 @Controller('bills')
 export class BillsController {
-  constructor(private billsService: BillsService, private wa: WhatsappService) {}
+  constructor(private billsService: BillsService) {}
 
   @Get()
   findAll(
@@ -79,49 +78,8 @@ export class BillsController {
     return this.billsService.bulkSendEmails(dto.apartmentId, dto.month, dto.year);
   }
 
-  @Post('bulk-send-whatsapp')
-  async bulkSendWhatsApp(@Body() dto: { apartmentId: string; month: number; year: number }) {
-    if (this.wa.status !== 'ready') {
-      return { error: 'WhatsApp not connected. Please connect first via /api/whatsapp/connect.' };
-    }
-    const summary = await this.billsService.getSummary(dto.apartmentId, dto.month, dto.year);
-    const bills = (summary as any).bills ?? [];
-    const unpaid = bills.filter((b: any) => b.status !== 'PAID');
-    const sent: string[] = [];
-    const failed: string[] = [];
-    const skipped: string[] = [];
-
-    for (const bill of unpaid) {
-      const tenant = bill.flat?.tenancies?.[0]?.user;
-      const phone = tenant?.phone;
-      const flat = bill.flat?.flatNumber;
-      if (!phone) { skipped.push(flat); continue; }
-
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const balance = bill.totalAmount - bill.paidAmount;
-      const msg =
-        `Dear ${tenant.name},\n\n` +
-        `Your maintenance bill for *${months[dto.month - 1]} ${dto.year}*:\n` +
-        `• Flat: *${flat}*\n` +
-        `• Maintenance: ₹${bill.maintenanceAmount}\n` +
-        (bill.waterAmount > 0 ? `• Water: ₹${bill.waterAmount}\n` : '') +
-        (bill.previousDue > 0 ? `• Previous Due: ₹${bill.previousDue}\n` : '') +
-        `• *Total: ₹${bill.totalAmount}*\n` +
-        (bill.paidAmount > 0 ? `• Paid: ₹${bill.paidAmount}\n` : '') +
-        `• *Balance Due: ₹${balance}*\n\n` +
-        `Please pay via UPI at your earliest convenience.\n\nThank you!\n— PSA Association`;
-
-      try {
-        await this.wa.sendMessage(phone, msg);
-        sent.push(flat);
-        await new Promise(r => setTimeout(r, 1500));
-      } catch (e: any) {
-        failed.push(flat);
-      }
-    }
-
-    return { sent, failed, skipped };
-  }
+  @Post('recalculate-all')
+  recalculateAll() { return this.billsService.recalculateAllStatuses(); }
 
   @Patch(':id')
   updateBill(@Param('id') id: string, @Body() dto: { maintenanceAmount?: number; waterAmount?: number; previousDue?: number }) {
