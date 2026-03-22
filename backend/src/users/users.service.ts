@@ -66,10 +66,18 @@ export class UsersService {
     return result;
   }
 
-  async update(id: string, dto: { name?: string; phone?: string; roles?: Role[] }) {
+  private readonly VALID_ROLES: Role[] = ['ADMIN', 'OWNER', 'TENANT', 'VIEWER', 'WATER_MANAGER'] as Role[];
+
+  async update(id: string, dto: { name?: string; phone?: string; roles?: string[] }) {
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.phone !== undefined) data.phone = dto.phone;
+    if (dto.roles !== undefined) {
+      data.roles = dto.roles.filter(r => this.VALID_ROLES.includes(r as Role)) as Role[];
+    }
     return this.prisma.user.update({
       where: { id },
-      data: dto,
+      data,
       select: { id: true, name: true, email: true, phone: true, roles: true },
     });
   }

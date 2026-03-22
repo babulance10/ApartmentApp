@@ -1,5 +1,5 @@
 import { html, render, TemplateResult } from 'lit';
-import { getToken } from './lib/auth.js';
+import { getToken, getUser } from './lib/auth.js';
 
 type RouteHandler = () => TemplateResult;
 
@@ -47,6 +47,36 @@ class HashRouter {
     if (route.layout) {
       // Auth guard
       if (!getToken()) { window.location.hash = '#/login'; return; }
+
+      // Role guard
+      const user = getUser();
+      const roles: string[] = user?.roles || [];
+      const isAdmin = roles.includes('ADMIN');
+      const isOwner = roles.includes('OWNER');
+      const isTenant = roles.includes('TENANT');
+      const isViewer = roles.includes('VIEWER');
+      const isWaterManager = roles.includes('WATER_MANAGER');
+
+      if (hash.startsWith('/admin') && !isAdmin && !isViewer && !(isWaterManager && hash === '/admin/water-meter')) {
+        // Non-admins cannot access /admin/* except VIEWER (dashboard/events) and WATER_MANAGER (water-meter)
+        if (isViewer) { window.location.hash = '#/admin'; return; }
+        if (isWaterManager) { window.location.hash = '#/admin/water-meter'; return; }
+        if (isOwner) { window.location.hash = '#/owner'; return; }
+        window.location.hash = '#/tenant'; return;
+      }
+      if (hash.startsWith('/admin') && isViewer && !isAdmin) {
+        // VIEWER can only see dashboard and events
+        if (hash !== '/admin' && hash !== '/admin/events') { window.location.hash = '#/admin'; return; }
+      }
+      if (hash.startsWith('/owner') && !isOwner && !isAdmin) {
+        window.location.hash = '#/tenant'; return;
+      }
+      if (hash.startsWith('/tenant') && !isTenant && !isAdmin) {
+        if (isOwner) { window.location.hash = '#/owner'; return; }
+        if (isViewer) { window.location.hash = '#/admin'; return; }
+        if (isWaterManager) { window.location.hash = '#/admin/water-meter'; return; }
+        window.location.hash = '#/login'; return;
+      }
 
       render(html`
         <div class="psa-shell">

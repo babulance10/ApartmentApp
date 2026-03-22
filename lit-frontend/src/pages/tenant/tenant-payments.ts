@@ -17,11 +17,18 @@ export class TenantPayments extends LitElement {
       const profile = await api.get('/users/me');
       const tenancy = profile.data.tenancies?.[0];
       if (tenancy?.flat) {
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
         const billsRes = await api.get(`/bills?flatId=${tenancy.flat.id}`);
         const bills = billsRes.data;
-        if (bills.length) {
+        // Only show bills up to current month (exclude future)
+        const relevantBills = bills.filter((b: any) =>
+          b.year < currentYear || (b.year === currentYear && b.month <= currentMonth)
+        );
+        if (relevantBills.length) {
           const allPayments = await Promise.all(
-            bills.map((b: any) => api.get(`/payments?billId=${b.id}`).then((r: any) => r.data.map((p: any) => ({ ...p, bill: b }))))
+            relevantBills.map((b: any) => api.get(`/payments?billId=${b.id}`).then((r: any) => r.data.map((p: any) => ({ ...p, bill: b }))))
           );
           this.payments = allPayments.flat().sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
         }
