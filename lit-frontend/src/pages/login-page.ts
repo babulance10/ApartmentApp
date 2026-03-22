@@ -23,7 +23,7 @@ export class LoginPage extends LitElement {
       const roles = data.user.roles || [];
       if (roles.includes('ADMIN')) window.location.hash = '#/admin';
       else if (roles.includes('OWNER')) window.location.hash = '#/owner';
-      else if (roles.includes('WATER_MANAGER')) window.location.hash = '#/admin/water-meter';
+      else if (roles.includes('WATER_MANAGER')) window.location.hash = '#/admin/water-purchases';
       else if (roles.includes('VIEWER')) window.location.hash = '#/admin';
       else window.location.hash = '#/tenant';
     } catch (err: any) {

@@ -57,24 +57,46 @@ class HashRouter {
       const isViewer = roles.includes('VIEWER');
       const isWaterManager = roles.includes('WATER_MANAGER');
 
-      if (hash.startsWith('/admin') && !isAdmin && !isViewer && !(isWaterManager && hash === '/admin/water-meter')) {
-        // Non-admins cannot access /admin/* except VIEWER (dashboard/events) and WATER_MANAGER (water-meter)
-        if (isViewer) { window.location.hash = '#/admin'; return; }
-        if (isWaterManager) { window.location.hash = '#/admin/water-meter'; return; }
-        if (isOwner) { window.location.hash = '#/owner'; return; }
-        window.location.hash = '#/tenant'; return;
+      // VIEWER: only dashboard + events
+      if (isViewer && !isAdmin) {
+        if (hash.startsWith('/admin') && hash !== '/admin' && hash !== '/admin/events') {
+          window.location.hash = '#/admin'; return;
+        }
+        if (hash.startsWith('/owner') || hash.startsWith('/tenant')) {
+          window.location.hash = '#/admin'; return;
+        }
       }
-      if (hash.startsWith('/admin') && isViewer && !isAdmin) {
-        // VIEWER can only see dashboard and events
-        if (hash !== '/admin' && hash !== '/admin/events') { window.location.hash = '#/admin'; return; }
+
+      // WATER_MANAGER: only water-purchases + profile
+      if (isWaterManager && !isAdmin && !isViewer) {
+        if (hash.startsWith('/admin') && hash !== '/admin/water-purchases') {
+          window.location.hash = '#/admin/water-purchases'; return;
+        }
+        if (hash.startsWith('/owner') || hash.startsWith('/tenant')) {
+          window.location.hash = '#/admin/water-purchases'; return;
+        }
       }
-      if (hash.startsWith('/owner') && !isOwner && !isAdmin) {
-        window.location.hash = '#/tenant'; return;
+
+      // OWNER: owner pages + contributions
+      if (isOwner && !isAdmin && !isViewer) {
+        const ownerAllowed = hash.startsWith('/owner') || hash === '/admin/contributions' || hash === '/profile';
+        if (hash.startsWith('/admin') && hash !== '/admin/contributions') {
+          window.location.hash = '#/owner'; return;
+        }
+        if (hash.startsWith('/tenant')) {
+          window.location.hash = '#/owner'; return;
+        }
       }
-      if (hash.startsWith('/tenant') && !isTenant && !isAdmin) {
-        if (isOwner) { window.location.hash = '#/owner'; return; }
-        if (isViewer) { window.location.hash = '#/admin'; return; }
-        if (isWaterManager) { window.location.hash = '#/admin/water-meter'; return; }
+
+      // TENANT: tenant pages only
+      if (isTenant && !isAdmin && !isOwner && !isViewer && !isWaterManager) {
+        if (hash.startsWith('/admin') || hash.startsWith('/owner')) {
+          window.location.hash = '#/tenant'; return;
+        }
+      }
+
+      // Catch-all: non-authenticated role accessing protected routes
+      if (!isAdmin && !isOwner && !isTenant && !isViewer && !isWaterManager) {
         window.location.hash = '#/login'; return;
       }
 
