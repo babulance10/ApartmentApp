@@ -8,7 +8,7 @@ export class AdminApartments extends LitElement {
   @state() private apartment: any = null;
   @state() private loading = true;
   @state() private modal = false;
-  @state() private form = { name: '', address: '', city: '', upiNumber: '', upiName: '' };
+  @state() private form = { name: '', address: '', city: '', upiNumber: '', upiName: '', maintenanceAmount: '2000' };
   @state() private saving = false;
 
   createRenderRoot() { return this; }
@@ -31,6 +31,7 @@ export class AdminApartments extends LitElement {
       city: this.apartment.city || '',
       upiNumber: this.apartment.upiNumber || '',
       upiName: this.apartment.upiName || '',
+      maintenanceAmount: String(this.apartment.maintenanceAmount ?? 2000),
     };
     this.modal = true;
   }
@@ -38,7 +39,7 @@ export class AdminApartments extends LitElement {
   private async _handleSave() {
     this.saving = true;
     try {
-      await api.patch(`/apartments/${this.apartment.id}`, this.form);
+      await api.patch(`/apartments/${this.apartment.id}`, { ...this.form, maintenanceAmount: parseFloat(this.form.maintenanceAmount) || 2000 });
       await this._load();
       this.modal = false;
     } catch (e: any) {
@@ -91,6 +92,15 @@ export class AdminApartments extends LitElement {
                     </div>
                   </div>
                   <div class="border-t border-gray-100 pt-4">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Billing Configuration</p>
+                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4">
+                      <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Monthly Maintenance</span>
+                        <span class="text-sm font-bold text-amber-700">₹${(this.apartment.maintenanceAmount ?? 2000).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="border-t border-gray-100 pt-4">
                     <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">UPI Payment Details</p>
                     <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
                       <div class="flex items-center justify-between">
@@ -115,6 +125,11 @@ export class AdminApartments extends LitElement {
             <psa-input label="City" .value=${this.form.city} @value-changed=${(e: CustomEvent) => this._updateForm('city', e.detail)}></psa-input>
             <psa-input label="UPI Number / Phone" .value=${this.form.upiNumber} @value-changed=${(e: CustomEvent) => this._updateForm('upiNumber', e.detail)}></psa-input>
             <psa-input label="UPI Account Name" .value=${this.form.upiName} @value-changed=${(e: CustomEvent) => this._updateForm('upiName', e.detail)}></psa-input>
+            <div class="border-t border-gray-100 pt-4">
+              <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Billing Configuration</p>
+              <psa-input label="Monthly Maintenance Amount (₹)" type="number" .value=${this.form.maintenanceAmount} @value-changed=${(e: CustomEvent) => this._updateForm('maintenanceAmount', e.detail)}></psa-input>
+              <p class="text-xs text-gray-400 mt-1">This amount will be used when generating new monthly bills.</p>
+            </div>
             <div class="flex gap-2 justify-end pt-2">
               <psa-button variant="secondary" @click=${() => this.modal = false}>Cancel</psa-button>
               <psa-button .loading=${this.saving} @click=${this._handleSave}>Save</psa-button>

@@ -19,7 +19,7 @@ export class ApartmentsService {
     return this.prisma.apartment.create({ data: dto });
   }
 
-  update(id: string, dto: { name?: string; address?: string; city?: string; upiNumber?: string; upiName?: string }) {
+  update(id: string, dto: { name?: string; address?: string; city?: string; upiNumber?: string; upiName?: string; maintenanceAmount?: number }) {
     return this.prisma.apartment.update({ where: { id }, data: dto });
   }
 }

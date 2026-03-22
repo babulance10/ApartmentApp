@@ -37,7 +37,9 @@ export class BillsService {
     });
   }
 
-  async generateMonthlyBills(apartmentId: string, month: number, year: number, maintenanceAmount = 2000) {
+  async generateMonthlyBills(apartmentId: string, month: number, year: number, maintenanceAmount?: number) {
+    const apartment = await this.prisma.apartment.findUnique({ where: { id: apartmentId } });
+    const amount = maintenanceAmount ?? (apartment as any)?.maintenanceAmount ?? 2000;
     const flats = await this.prisma.flat.findMany({ where: { apartmentId } });
     const created: any[] = [];
     for (const flat of flats) {
@@ -66,7 +68,7 @@ export class BillsService {
       const creditAmount = pendingContributions.reduce((s, c) => s + c.amount, 0);
       const netPreviousDue = Math.max(0, previousDue - creditAmount);
 
-      const totalAmount = maintenanceAmount + waterAmount + netPreviousDue;
+      const totalAmount = amount + waterAmount + netPreviousDue;
 
       const existing = await this.prisma.monthlyBill.findUnique({
         where: { flatId_month_year: { flatId: flat.id, month, year } },
@@ -74,7 +76,7 @@ export class BillsService {
 
       if (!existing) {
         const bill = await this.prisma.monthlyBill.create({
-          data: { flatId: flat.id, month, year, maintenanceAmount, waterAmount, previousDue: netPreviousDue, totalAmount },
+          data: { flatId: flat.id, month, year, maintenanceAmount: amount, waterAmount, previousDue: netPreviousDue, totalAmount },
         });
         // Mark contributions as applied
         if (pendingContributions.length > 0) {
