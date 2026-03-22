@@ -94,10 +94,16 @@ export class LoginPage extends LitElement {
               </button>
             </form>
 
-            <div class="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
-              <p class="font-medium text-gray-600">Demo credentials:</p>
-              <p>Admin: admin@psa.com / admin123</p>
-              <p>Tenant: flat101@psa.com / tenant123</p>
+            <div class="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg text-xs text-gray-600 space-y-2">
+              <p class="font-semibold text-blue-900">First-time Login Instructions:</p>
+              <p><strong>Tenants:</strong> Use <code class="bg-white px-1 py-0.5 rounded text-blue-700 font-mono">flatXXX@psa.com</code> (where XXX is your flat number)</p>
+              <p><strong>Default Password:</strong> <code class="bg-white px-1 py-0.5 rounded text-blue-700 font-mono">tenant123</code></p>
+              <p class="text-amber-700 font-medium">⚠️ After first login, please update your password and phone number in My Profile</p>
+            </div>
+            
+            <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
+              <p class="font-medium text-gray-600">Admin Demo:</p>
+              <p>admin@psa.com / admin123</p>
             </div>
           </div>
         </div>
