@@ -14,8 +14,8 @@ async function bootstrap() {
   app.enableCors({ origin: allowedOrigins, credentials: true });
 
   // Trust proxy for Cloudflare / Render
-  const httpServer = app.getHttpServer();
-  httpServer.set('trust proxy', 1);
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.getInstance().set('trust proxy', 1);
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.setGlobalPrefix('api');
