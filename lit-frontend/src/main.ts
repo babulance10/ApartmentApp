@@ -30,6 +30,7 @@ import './pages/admin/admin-events.js';
 import './pages/tenant/tenant-bills.js';
 import './pages/tenant/tenant-payments.js';
 import './pages/tenant/tenant-maintenance.js';
+import './pages/tenant/tenant-bill-print.js';
 import './pages/owner/owner-dashboard.js';
 import './pages/profile-page.js';
 
@@ -51,6 +52,7 @@ router
   .register('/tenant', () => html`<tenant-bills></tenant-bills>`, true)
   .register('/tenant/payments', () => html`<tenant-payments></tenant-payments>`, true)
   .register('/tenant/maintenance', () => html`<tenant-maintenance></tenant-maintenance>`, true)
+  .register('/tenant/bill-print', () => html`<tenant-bill-print></tenant-bill-print>`, true)
   .register('/owner', () => html`<owner-dashboard></owner-dashboard>`, true)
   .register('/owner/water-meter', () => html`<admin-water-meter></admin-water-meter>`, true)
   .register('/profile', () => html`<profile-page></profile-page>`, true);

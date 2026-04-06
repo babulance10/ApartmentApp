@@ -86,6 +86,12 @@ export class TenantBills extends LitElement {
                 </div>
               </div>
 
+              <div class="flex gap-2 mb-4">
+                <a href="#/tenant/bill-print?billId=${bill.id}" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium no-underline cursor-pointer">
+                  🖨️ Print Bill
+                </a>
+              </div>
+
               <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div class="px-6 py-4 border-b border-gray-100"><h2 class="font-semibold text-gray-900">Bill Breakdown</h2></div>
                 <div class="px-6 py-4 space-y-3">
