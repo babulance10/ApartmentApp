@@ -29,30 +29,48 @@ export class WaterMeterService {
   }) {
     const litersConsumed = dto.currentReading - dto.previousReading;
     
-    // Calculate price per liter from actual tanker purchases for this month
-    let pricePerLiter = dto.pricePerLiter ?? 0.088;
-    
-    if (!dto.pricePerLiter) {
-      // Get flat's apartment to find tanker purchases
-      const flat = await this.prisma.flat.findUnique({ where: { id: dto.flatId } });
-      if (flat) {
-        const purchases = await this.prisma.waterPurchase.findMany({
-          where: {
-            apartmentId: flat.apartmentId,
-            month: dto.month,
-            year: dto.year,
-          },
-        });
-        
-        if (purchases.length > 0) {
-          const totalLiters = purchases.reduce((sum, p) => sum + p.capacityLiters, 0);
-          const totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
-          pricePerLiter = totalLiters > 0 ? totalCost / totalLiters : 0.088;
+    // Get flat's apartment to find tanker purchases and total consumption
+    const flat = await this.prisma.flat.findUnique({ where: { id: dto.flatId } });
+    if (!flat) throw new Error('Flat not found');
+
+    const purchases = await this.prisma.waterPurchase.findMany({
+      where: {
+        apartmentId: flat.apartmentId,
+        month: dto.month,
+        year: dto.year,
+      },
+    });
+
+    let pricePerLiter = 0.088;
+    let waterAmount = Math.round(litersConsumed * pricePerLiter);
+
+    if (purchases.length > 0) {
+      const totalTankerLiters = purchases.reduce((sum, p) => sum + p.capacityLiters, 0);
+      const totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
+      
+      // Get all readings for this month to calculate total consumption
+      const allReadings = await this.prisma.waterMeterReading.findMany({
+        where: {
+          month: dto.month,
+          year: dto.year,
+          flat: { apartmentId: flat.apartmentId },
+        },
+      });
+      
+      // Calculate total consumption (including this flat's updated consumption)
+      let totalConsumed = litersConsumed; // Start with current flat
+      allReadings.forEach(r => {
+        if (r.flatId !== dto.flatId) {
+          totalConsumed += r.litersConsumed;
         }
+      });
+      
+      // Proportional distribution: (flat liters / total liters) × total cost
+      if (totalConsumed > 0) {
+        waterAmount = Math.round((litersConsumed / totalConsumed) * totalCost);
+        pricePerLiter = totalCost / totalConsumed;
       }
     }
-    
-    const waterAmount = Math.round(litersConsumed * pricePerLiter);
 
     return this.prisma.waterMeterReading.upsert({
       where: { flatId_month_year: { flatId: dto.flatId, month: dto.month, year: dto.year } },
@@ -82,39 +100,58 @@ export class WaterMeterService {
     let noTankerData = 0;
     const details: any[] = [];
 
-    for (const reading of readings) {
+    // Group readings by apartment/month/year for batch processing
+    const groups = new Map<string, any[]>();
+    readings.forEach(r => {
+      const key = `${r.flat.apartmentId}-${r.month}-${r.year}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    });
+
+    // Process each group
+    for (const [key, groupReadings] of groups) {
+      const [apartmentId, month, year] = key.split('-');
+      
       // Get tanker purchases for this month/year
       const purchases = await this.prisma.waterPurchase.findMany({
         where: {
-          apartmentId: reading.flat.apartmentId,
-          month: reading.month,
-          year: reading.year,
+          apartmentId,
+          month: parseInt(month),
+          year: parseInt(year),
         },
       });
 
       if (purchases.length > 0) {
-        const totalLiters = purchases.reduce((sum, p) => sum + p.capacityLiters, 0);
         const totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
-        const pricePerLiter = totalLiters > 0 ? totalCost / totalLiters : 0.088;
-        const waterAmount = Math.round(reading.litersConsumed * pricePerLiter);
+        const totalConsumed = groupReadings.reduce((sum, r) => sum + r.litersConsumed, 0);
+        const pricePerLiter = totalConsumed > 0 ? totalCost / totalConsumed : 0.088;
 
-        // Always update when tanker data exists (ignore floating point comparison issues)
-        await this.prisma.waterMeterReading.update({
-          where: { id: reading.id },
-          data: { pricePerLiter, waterAmount },
-        });
-        updated++;
-        details.push({
-          flat: reading.flat.flatNumber,
-          month: reading.month,
-          year: reading.year,
-          oldAmount: reading.waterAmount,
-          newAmount: waterAmount,
-          oldRate: parseFloat(reading.pricePerLiter.toFixed(4)),
-          newRate: parseFloat(pricePerLiter.toFixed(4)),
-        });
+        // Update each reading with proportional distribution
+        for (const reading of groupReadings) {
+          const waterAmount = totalConsumed > 0 
+            ? Math.round((reading.litersConsumed / totalConsumed) * totalCost)
+            : Math.round(reading.litersConsumed * 0.088);
+
+          await this.prisma.waterMeterReading.update({
+            where: { id: reading.id },
+            data: { pricePerLiter, waterAmount },
+          });
+          updated++;
+          
+          if (details.length < 10) {
+            details.push({
+              flat: reading.flat.flatNumber,
+              month: reading.month,
+              year: reading.year,
+              consumed: reading.litersConsumed,
+              oldAmount: reading.waterAmount,
+              newAmount: waterAmount,
+              rate: parseFloat(pricePerLiter.toFixed(4)),
+            });
+          }
+        }
       } else {
-        noTankerData++;
+        noTankerData += groupReadings.length;
       }
     }
 
@@ -123,7 +160,7 @@ export class WaterMeterService {
       updated,
       noTankerData,
       message: `Updated ${updated} readings. ${noTankerData} readings skipped (no tanker data for that month/year)`,
-      details: details.slice(0, 10), // Show first 10 updates
+      details,
     };
   }
 }
