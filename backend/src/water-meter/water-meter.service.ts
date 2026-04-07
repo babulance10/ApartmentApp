@@ -137,82 +137,87 @@ export class WaterMeterService {
   }
 
   async recalculateAll() {
-    const readings = await this.prisma.waterMeterReading.findMany({
-      include: { flat: true },
-    });
-
-    let updated = 0;
-    let noTankerData = 0;
-    const details: any[] = [];
-
-    // Group readings by apartment/month/year for batch processing
-    const groups = new Map<string, { readings: any[], apartmentId: string, month: number, year: number }>();
-    readings.forEach(r => {
-      const key = `${r.flat.apartmentId}|${r.month}|${r.year}`;
-      if (!groups.has(key)) {
-        groups.set(key, { 
-          readings: [], 
-          apartmentId: r.flat.apartmentId, 
-          month: r.month, 
-          year: r.year 
-        });
-      }
-      groups.get(key)!.readings.push(r);
-    });
-
-    // Process each group
-    for (const groupData of groups.values()) {
-      const { readings: groupReadings, apartmentId, month, year } = groupData;
-      
-      // Get tanker purchases for this month/year
-      const purchases = await this.prisma.waterPurchase.findMany({
-        where: {
-          apartmentId,
-          month,
-          year,
-        },
+    try {
+      const readings = await this.prisma.waterMeterReading.findMany({
+        include: { flat: true },
       });
 
-      if (purchases.length > 0) {
-        const totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
-        const totalConsumed = groupReadings.reduce((sum, r) => sum + r.litersConsumed, 0);
-        const pricePerLiter = totalConsumed > 0 ? totalCost / totalConsumed : 0.088;
+      let updated = 0;
+      let noTankerData = 0;
+      const details: any[] = [];
 
-        // Update each reading with proportional distribution
-        for (const reading of groupReadings) {
-          const waterAmount = totalConsumed > 0 
-            ? Math.round((reading.litersConsumed / totalConsumed) * totalCost)
-            : Math.round(reading.litersConsumed * 0.088);
-
-          await this.prisma.waterMeterReading.update({
-            where: { id: reading.id },
-            data: { pricePerLiter, waterAmount },
+      // Group readings by apartment/month/year for batch processing
+      const groups = new Map<string, { readings: any[], apartmentId: string, month: number, year: number }>();
+      readings.forEach(r => {
+        const key = `${r.flat.apartmentId}|${r.month}|${r.year}`;
+        if (!groups.has(key)) {
+          groups.set(key, { 
+            readings: [], 
+            apartmentId: r.flat.apartmentId, 
+            month: r.month, 
+            year: r.year 
           });
-          updated++;
-          
-          if (details.length < 10) {
-            details.push({
-              flat: reading.flat.flatNumber,
-              month: reading.month,
-              year: reading.year,
-              consumed: reading.litersConsumed,
-              oldAmount: reading.waterAmount,
-              newAmount: waterAmount,
-              rate: parseFloat(pricePerLiter.toFixed(4)),
-            });
-          }
         }
-      } else {
-        noTankerData += groupReadings.length;
-      }
-    }
+        groups.get(key)!.readings.push(r);
+      });
 
-    return { 
-      total: readings.length, 
-      updated,
-      noTankerData,
-      message: `Updated ${updated} readings. ${noTankerData} readings skipped (no tanker data for that month/year)`,
-      details,
-    };
+      // Process each group
+      for (const groupData of groups.values()) {
+        const { readings: groupReadings, apartmentId, month, year } = groupData;
+        
+        // Get tanker purchases for this month/year
+        const purchases = await this.prisma.waterPurchase.findMany({
+          where: {
+            apartmentId,
+            month,
+            year,
+          },
+        });
+
+        if (purchases.length > 0) {
+          const totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
+          const totalConsumed = groupReadings.reduce((sum, r) => sum + r.litersConsumed, 0);
+          const pricePerLiter = totalConsumed > 0 ? totalCost / totalConsumed : 0.088;
+
+          // Update each reading with proportional distribution
+          for (const reading of groupReadings) {
+            const waterAmount = totalConsumed > 0 
+              ? Math.round((reading.litersConsumed / totalConsumed) * totalCost)
+              : Math.round(reading.litersConsumed * 0.088);
+
+            await this.prisma.waterMeterReading.update({
+              where: { id: reading.id },
+              data: { pricePerLiter, waterAmount },
+            });
+            updated++;
+            
+            if (details.length < 10) {
+              details.push({
+                flat: reading.flat.flatNumber,
+                month: reading.month,
+                year: reading.year,
+                consumed: reading.litersConsumed,
+                oldAmount: reading.waterAmount,
+                newAmount: waterAmount,
+                rate: parseFloat(pricePerLiter.toFixed(4)),
+              });
+            }
+          }
+        } else {
+          noTankerData += groupReadings.length;
+        }
+      }
+
+      return { 
+        total: readings.length, 
+        updated,
+        noTankerData,
+        message: `Updated ${updated} readings. ${noTankerData} readings skipped (no tanker data for that month/year)`,
+        details,
+      };
+    } catch (error: any) {
+      console.error('Recalculate error:', error);
+      throw new Error(`Recalculate failed: ${error.message}`);
+    }
   }
 }
