@@ -80,7 +80,52 @@ export class WaterMeterService {
   }
 
   async bulkUpsert(readings: Array<{ flatId: string; month: number; year: number; previousReading: number; currentReading: number; pricePerLiter?: number }>) {
-    return Promise.all(readings.map(r => this.upsert(r)));
+    if (readings.length === 0) return [];
+
+    // Get apartment info from first reading
+    const firstFlat = await this.prisma.flat.findUnique({ where: { id: readings[0].flatId } });
+    if (!firstFlat) throw new Error('Flat not found');
+
+    const month = readings[0].month;
+    const year = readings[0].year;
+
+    // Get tanker purchases for this month
+    const purchases = await this.prisma.waterPurchase.findMany({
+      where: {
+        apartmentId: firstFlat.apartmentId,
+        month,
+        year,
+      },
+    });
+
+    let pricePerLiter = 0.088;
+    let totalCost = 0;
+    let totalConsumed = 0;
+
+    if (purchases.length > 0) {
+      totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
+      // Calculate total consumption from the new readings
+      totalConsumed = readings.reduce((sum, r) => sum + (r.currentReading - r.previousReading), 0);
+      pricePerLiter = totalConsumed > 0 ? totalCost / totalConsumed : 0.088;
+    }
+
+    // Save all readings with calculated amounts
+    const results: any[] = [];
+    for (const dto of readings) {
+      const litersConsumed = dto.currentReading - dto.previousReading;
+      const waterAmount = purchases.length > 0 && totalConsumed > 0
+        ? Math.round((litersConsumed / totalConsumed) * totalCost)
+        : Math.round(litersConsumed * 0.088);
+
+      const result = await this.prisma.waterMeterReading.upsert({
+        where: { flatId_month_year: { flatId: dto.flatId, month: dto.month, year: dto.year } },
+        update: { previousReading: dto.previousReading, currentReading: dto.currentReading, litersConsumed, pricePerLiter, waterAmount },
+        create: { flatId: dto.flatId, month: dto.month, year: dto.year, previousReading: dto.previousReading, currentReading: dto.currentReading, litersConsumed, pricePerLiter, waterAmount },
+      });
+      results.push(result);
+    }
+
+    return results;
   }
 
   getByApartment(apartmentId: string, month: number, year: number) {
