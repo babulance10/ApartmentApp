@@ -19,11 +19,21 @@ export class BillsSchedulerService {
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
     this.logger.log(`Scheduled email reminder: ${month}/${year}`);
+    
+    // Check if SMTP is configured
+    const smtpUser = this.config.get<string>('SMTP_USER');
+    const smtpPass = this.config.get<string>('SMTP_PASS');
+    if (!smtpUser || !smtpPass) {
+      this.logger.warn('SMTP not configured - skipping email reminders');
+      return;
+    }
+    
     try {
       const result = await this.billsService.bulkSendEmails(this.APARTMENT_ID, month, year);
       this.logger.log(`Sent: ${result.sent.length}, Skipped: ${result.skipped.length}, Failed: ${result.failed.length}`);
     } catch (err) {
       this.logger.error('Scheduled email failed', err);
+      // Don't throw - let cron continue
     }
   }
 
@@ -34,11 +44,21 @@ export class BillsSchedulerService {
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
     this.logger.log(`Mid-month reminder: ${month}/${year}`);
+    
+    // Check if SMTP is configured
+    const smtpUser = this.config.get<string>('SMTP_USER');
+    const smtpPass = this.config.get<string>('SMTP_PASS');
+    if (!smtpUser || !smtpPass) {
+      this.logger.warn('SMTP not configured - skipping mid-month reminders');
+      return;
+    }
+    
     try {
       const result = await this.billsService.bulkSendEmails(this.APARTMENT_ID, month, year);
       this.logger.log(`Sent: ${result.sent.length}, Skipped: ${result.skipped.length}, Failed: ${result.failed.length}`);
     } catch (err) {
       this.logger.error('Mid-month email failed', err);
+      // Don't throw - let cron continue
     }
   }
 }
