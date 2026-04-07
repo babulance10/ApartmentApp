@@ -42,6 +42,8 @@ export class BillsService {
     const amount = maintenanceAmount ?? (apartment as any)?.maintenanceAmount ?? 2000;
     const flats = await this.prisma.flat.findMany({ where: { apartmentId } });
     const created: any[] = [];
+    let commonWaterAmount = 0;
+    
     for (const flat of flats) {
       const prevBill = await this.prisma.monthlyBill.findFirst({
         where: { flatId: flat.id },
@@ -61,6 +63,14 @@ export class BillsService {
       });
       const waterAmount = waterReading ? waterReading.waterAmount : 0;
 
+      // Common flat: maintenance = 0, track water amount for expense
+      const isCommon = flat.flatNumber === 'Common';
+      const flatMaintenance = isCommon ? 0 : amount;
+      
+      if (isCommon && waterAmount > 0) {
+        commonWaterAmount = waterAmount;
+      }
+
       // Auto-deduct unapplied contributions from previous months
       const pendingContributions = await this.prisma.flatContribution.findMany({
         where: {
@@ -75,7 +85,7 @@ export class BillsService {
       const creditAmount = pendingContributions.reduce((s, c) => s + c.amount, 0);
       const netPreviousDue = Math.max(0, previousDue - creditAmount);
 
-      const totalAmount = amount + waterAmount + netPreviousDue;
+      const totalAmount = flatMaintenance + waterAmount + netPreviousDue;
 
       const existing = await this.prisma.monthlyBill.findUnique({
         where: { flatId_month_year: { flatId: flat.id, month, year } },
@@ -83,7 +93,7 @@ export class BillsService {
 
       if (!existing) {
         const bill = await this.prisma.monthlyBill.create({
-          data: { flatId: flat.id, month, year, maintenanceAmount: amount, waterAmount, previousDue: netPreviousDue, totalAmount },
+          data: { flatId: flat.id, month, year, maintenanceAmount: flatMaintenance, waterAmount, previousDue: netPreviousDue, totalAmount },
         });
         // Mark contributions as applied
         if (pendingContributions.length > 0) {
@@ -95,6 +105,24 @@ export class BillsService {
         created.push({ ...bill, creditApplied: creditAmount });
       }
     }
+    
+    // Create expense for Common flat water amount
+    if (commonWaterAmount > 0) {
+      const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+      await this.prisma.expense.create({
+        data: {
+          apartmentId,
+          category: 'Water',
+          description: `Common Area Water - ${MONTH_NAMES[month]} ${year}`,
+          amount: commonWaterAmount,
+          month,
+          year,
+          expenseDate: new Date(year, month - 1, 1),
+        },
+      });
+    }
+    
     return created;
   }
 

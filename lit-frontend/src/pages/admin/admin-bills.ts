@@ -572,7 +572,7 @@ export class AdminBills extends LitElement {
         <!-- ── Print Template ── -->
         ${this.printingAll ? html`
           <div class="print-only">
-            <div style="padding:20px;font-family:Arial,sans-serif;line-height:1.4">
+            <div style="padding:15px;font-family:Arial,sans-serif;line-height:1.4;max-width:100%">
               <!-- Header -->
               <div style="text-align:center;margin-bottom:15px;border-bottom:3px solid #000;padding-bottom:10px">
                 <h1 style="color:#006600;font-size:18px;margin:0;font-weight:bold">PRIMARK SREENIDHI APARTMENT ASSOCIATION, KONDAPUR,</h1>
@@ -621,7 +621,7 @@ export class AdminBills extends LitElement {
                     <td style="border:1px solid #000;padding:6px;text-align:center">${bill.maintenanceAmount}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center">${bill.waterAmount}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center">${bill.previousDue > 0 ? bill.previousDue : 'Nil'}</td>
-                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.litersConsumed || '-'}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.litersConsumed ? bill.litersConsumed * 10 : '-'}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold">${bill.totalAmount}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center"></td>
                   </tr>
@@ -629,8 +629,8 @@ export class AdminBills extends LitElement {
               </table>
 
               <!-- Footer -->
-              <div style="margin-top:40px;text-align:center;font-size:13px">
-                <p style="margin:20px 0">With Best Regards,</p>
+              <div style="margin-top:15px;text-align:center;font-size:13px">
+                <p style="margin:10px 0">With Best Regards,</p>
                 <p style="margin:0">PSA Association, Kondapur, Hyderabad</p>
               </div>
             </div>
