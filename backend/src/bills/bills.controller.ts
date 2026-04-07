@@ -15,6 +15,20 @@ export class BillsCronController {
   ) {
     const expected = this.config.get<string>('CRON_SECRET', '');
     if (!expected || secret !== expected) throw new UnauthorizedException('Invalid cron secret');
+    
+    // Check if SMTP is configured
+    const smtpUser = this.config.get<string>('SMTP_USER');
+    const smtpPass = this.config.get<string>('SMTP_PASS');
+    if (!smtpUser || !smtpPass) {
+      return { 
+        success: true, 
+        message: 'SMTP not configured - skipping email reminders',
+        sent: [],
+        skipped: [],
+        failed: []
+      };
+    }
+    
     const now = new Date();
     const month = body.month ?? now.getMonth() + 1;
     const year = body.year ?? now.getFullYear();
