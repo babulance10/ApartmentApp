@@ -146,19 +146,23 @@ export class WaterMeterService {
     const details: any[] = [];
 
     // Group readings by apartment/month/year for batch processing
-    const groups = new Map<string, any[]>();
+    const groups = new Map<string, { readings: any[], apartmentId: string, month: number, year: number }>();
     readings.forEach(r => {
-      const key = `${r.flat.apartmentId}-${r.month}-${r.year}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(r);
+      const key = `${r.flat.apartmentId}|${r.month}|${r.year}`;
+      if (!groups.has(key)) {
+        groups.set(key, { 
+          readings: [], 
+          apartmentId: r.flat.apartmentId, 
+          month: r.month, 
+          year: r.year 
+        });
+      }
+      groups.get(key)!.readings.push(r);
     });
 
     // Process each group
-    for (const [key, groupReadings] of groups) {
-      const parts = key.split('-');
-      const apartmentId = parts[0];
-      const month = parseInt(parts[1], 10);
-      const year = parseInt(parts[2], 10);
+    for (const groupData of groups.values()) {
+      const { readings: groupReadings, apartmentId, month, year } = groupData;
       
       // Get tanker purchases for this month/year
       const purchases = await this.prisma.waterPurchase.findMany({
