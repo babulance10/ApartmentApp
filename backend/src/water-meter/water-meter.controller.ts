@@ -2,9 +2,17 @@ import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/co
 import { WaterMeterService } from './water-meter.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@UseGuards(JwtAuthGuard)
 @Controller('water-meter')
 export class WaterMeterController {
+  constructor(private waterMeterService: WaterMeterService) {}
+
+  @Post('recalculate')
+  recalculateAll() { return this.waterMeterService.recalculateAll(); }
+}
+
+@UseGuards(JwtAuthGuard)
+@Controller('water-meter')
+export class WaterMeterAuthController {
   constructor(private waterMeterService: WaterMeterService) {}
 
   @Get()
@@ -25,7 +33,4 @@ export class WaterMeterController {
 
   @Post('bulk')
   bulkUpsert(@Body() dto: { readings: any[] }) { return this.waterMeterService.bulkUpsert(dto.readings); }
-
-  @Post('recalculate')
-  recalculateAll() { return this.waterMeterService.recalculateAll(); }
 }
