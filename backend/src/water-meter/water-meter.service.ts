@@ -28,7 +28,30 @@ export class WaterMeterService {
     previousReading: number; currentReading: number; pricePerLiter?: number;
   }) {
     const litersConsumed = dto.currentReading - dto.previousReading;
-    const pricePerLiter = dto.pricePerLiter ?? 0.088;
+    
+    // Calculate price per liter from actual tanker purchases for this month
+    let pricePerLiter = dto.pricePerLiter ?? 0.088;
+    
+    if (!dto.pricePerLiter) {
+      // Get flat's apartment to find tanker purchases
+      const flat = await this.prisma.flat.findUnique({ where: { id: dto.flatId } });
+      if (flat) {
+        const purchases = await this.prisma.waterPurchase.findMany({
+          where: {
+            apartmentId: flat.apartmentId,
+            month: dto.month,
+            year: dto.year,
+          },
+        });
+        
+        if (purchases.length > 0) {
+          const totalLiters = purchases.reduce((sum, p) => sum + p.capacityLiters, 0);
+          const totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
+          pricePerLiter = totalLiters > 0 ? totalCost / totalLiters : 0.088;
+        }
+      }
+    }
+    
     const waterAmount = Math.round(litersConsumed * pricePerLiter);
 
     return this.prisma.waterMeterReading.upsert({
