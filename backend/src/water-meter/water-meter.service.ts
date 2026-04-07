@@ -98,22 +98,21 @@ export class WaterMeterService {
         const pricePerLiter = totalLiters > 0 ? totalCost / totalLiters : 0.088;
         const waterAmount = Math.round(reading.litersConsumed * pricePerLiter);
 
-        // Update if different
-        if (reading.pricePerLiter !== pricePerLiter || reading.waterAmount !== waterAmount) {
-          await this.prisma.waterMeterReading.update({
-            where: { id: reading.id },
-            data: { pricePerLiter, waterAmount },
-          });
-          updated++;
-          details.push({
-            flat: reading.flat.flatNumber,
-            month: reading.month,
-            year: reading.year,
-            oldAmount: reading.waterAmount,
-            newAmount: waterAmount,
-            pricePerLiter: parseFloat(pricePerLiter.toFixed(4)),
-          });
-        }
+        // Always update when tanker data exists (ignore floating point comparison issues)
+        await this.prisma.waterMeterReading.update({
+          where: { id: reading.id },
+          data: { pricePerLiter, waterAmount },
+        });
+        updated++;
+        details.push({
+          flat: reading.flat.flatNumber,
+          month: reading.month,
+          year: reading.year,
+          oldAmount: reading.waterAmount,
+          newAmount: waterAmount,
+          oldRate: parseFloat(reading.pricePerLiter.toFixed(4)),
+          newRate: parseFloat(pricePerLiter.toFixed(4)),
+        });
       } else {
         noTankerData++;
       }

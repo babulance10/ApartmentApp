@@ -5,7 +5,6 @@ import { formatCurrency, monthName, currentMonthYear, MONTHS } from '../../lib/u
 import api from '../../lib/api.js';
 
 const APARTMENT_ID = 'psa-main';
-const PRICE_PER_LITER = 0.088;
 
 @customElement('admin-water-meter')
 export class AdminWaterMeter extends LitElement {
@@ -62,7 +61,7 @@ export class AdminWaterMeter extends LitElement {
     this.saving = true;
     const readingsList = this.flats
       .filter(f => this.readings[f.id]?.prev !== '' && this.readings[f.id]?.curr !== '')
-      .map(f => ({ flatId: f.id, month: this.month, year: this.year, previousReading: parseFloat(this.readings[f.id].prev), currentReading: parseFloat(this.readings[f.id].curr), pricePerLiter: PRICE_PER_LITER }));
+      .map(f => ({ flatId: f.id, month: this.month, year: this.year, previousReading: parseFloat(this.readings[f.id].prev), currentReading: parseFloat(this.readings[f.id].curr) }));
     try { await api.post('/water-meter/bulk', { readings: readingsList }); await this._loadReadings(); alert('Readings saved!'); }
     catch (e: any) { alert(e.response?.data?.message || 'Error saving readings'); }
     this.saving = false;
@@ -93,7 +92,7 @@ export class AdminWaterMeter extends LitElement {
         <div class="flex items-center justify-between mb-6">
           <div>
             <h1 class="text-2xl font-bold text-gray-900">Water Meter Readings</h1>
-            <p class="text-gray-500 text-sm mt-1">Rate: ₹${PRICE_PER_LITER}/liter</p>
+            <p class="text-gray-500 text-sm mt-1">Rate calculated from tanker purchases</p>
           </div>
           <div class="flex gap-2">
             <psa-button .loading=${this.recalculating} @click=${this._handleRecalculate} variant="secondary">Recalculate All</psa-button>
@@ -120,7 +119,7 @@ export class AdminWaterMeter extends LitElement {
                     const prev = parseFloat(this.readings[flat.id]?.prev || '0') || 0;
                     const curr = parseFloat(this.readings[flat.id]?.curr || '0') || 0;
                     const consumed = curr > prev ? curr - prev : 0;
-                    const amount = Math.round(consumed * PRICE_PER_LITER);
+                    const amount = 0; // Will be calculated by backend based on tanker purchases
                     return html`
                       <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 font-medium text-gray-900">
