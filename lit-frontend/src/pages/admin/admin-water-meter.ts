@@ -15,6 +15,7 @@ export class AdminWaterMeter extends LitElement {
   @state() private readings: Record<string, { prev: string; curr: string }> = {};
   @state() private loading = true;
   @state() private saving = false;
+  @state() private recalculating = false;
 
   createRenderRoot() { return this; }
   connectedCallback() { super.connectedCallback(); this._loadFlats(); }
@@ -71,6 +72,19 @@ export class AdminWaterMeter extends LitElement {
     this.readings = { ...this.readings, [flatId]: { ...this.readings[flatId], [field]: val } };
   }
 
+  private async _handleRecalculate() {
+    if (!confirm('Recalculate all water amounts based on actual tanker purchases? This will update all existing records.')) return;
+    this.recalculating = true;
+    try {
+      const { data } = await api.post('/water-meter/recalculate', {});
+      alert(`Recalculated ${data.updated} out of ${data.total} water readings`);
+      await this._loadReadings();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Error recalculating water amounts');
+    }
+    this.recalculating = false;
+  }
+
   private _years = [2024, 2025, 2026, 2027];
 
   render() {
@@ -81,7 +95,10 @@ export class AdminWaterMeter extends LitElement {
             <h1 class="text-2xl font-bold text-gray-900">Water Meter Readings</h1>
             <p class="text-gray-500 text-sm mt-1">Rate: ₹${PRICE_PER_LITER}/liter</p>
           </div>
-          <psa-button .loading=${this.saving} @click=${this._handleSave}>${iconSave('w-4 h-4')} Save Readings</psa-button>
+          <div class="flex gap-2">
+            <psa-button .loading=${this.recalculating} @click=${this._handleRecalculate} variant="secondary">Recalculate All</psa-button>
+            <psa-button .loading=${this.saving} @click=${this._handleSave}>${iconSave('w-4 h-4')} Save Readings</psa-button>
+          </div>
         </div>
         <div class="flex gap-3 mb-6">
           <psa-select .value=${String(this.month)} @value-changed=${(e: CustomEvent) => this.month = +e.detail}>
