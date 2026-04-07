@@ -34,6 +34,7 @@ async function main() {
   });
 
   const flats = [
+    { flatNumber: 'Common', floor: 0 },
     { flatNumber: '101', floor: 1 }, { flatNumber: '102', floor: 1 }, { flatNumber: '103', floor: 1 },
     { flatNumber: '201', floor: 2 }, { flatNumber: '202', floor: 2 }, { flatNumber: '203', floor: 2 },
     { flatNumber: '301', floor: 3 }, { flatNumber: '302', floor: 3 }, { flatNumber: '303', floor: 3 },
