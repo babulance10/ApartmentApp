@@ -155,14 +155,17 @@ export class WaterMeterService {
 
     // Process each group
     for (const [key, groupReadings] of groups) {
-      const [apartmentId, month, year] = key.split('-');
+      const parts = key.split('-');
+      const apartmentId = parts[0];
+      const month = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
       
       // Get tanker purchases for this month/year
       const purchases = await this.prisma.waterPurchase.findMany({
         where: {
           apartmentId,
-          month: parseInt(month),
-          year: parseInt(year),
+          month,
+          year,
         },
       });
 
