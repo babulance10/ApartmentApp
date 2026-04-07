@@ -26,6 +26,7 @@ export class AdminBills extends LitElement {
   @state() private waBulkModal = false;
   @state() private waSentFlats: Set<string> = new Set();
   @state() private printBill: any = null;
+  @state() private regenerating = false;
 
   createRenderRoot() { return this; }
   connectedCallback() { super.connectedCallback(); this._load(); }
@@ -132,6 +133,19 @@ export class AdminBills extends LitElement {
     this.generating = false;
   }
 
+  private async _regenerateBills() {
+    if (!confirm('Delete existing bills for this month and regenerate with updated water amounts? This will include any new water meter readings.')) return;
+    this.regenerating = true;
+    try {
+      await api.post('/bills/regenerate', { apartmentId: APARTMENT_ID, month: this.month, year: this.year, maintenanceAmount: 2000 });
+      alert('Bills regenerated successfully with updated water amounts!');
+      await this._load();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Error regenerating bills');
+    }
+    this.regenerating = false;
+  }
+
   private async _handlePayment() {
     if (!this.payModal) return;
     this.saving = true;
@@ -203,6 +217,11 @@ export class AdminBills extends LitElement {
             <button @click=${this._recalculateAll} title="Fix bill statuses based on actual payments"
               class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-amber-50 hover:border-amber-300 shadow-sm cursor-pointer border-none transition-all">
               ${iconZap('w-4 h-4 text-amber-500')} Fix Statuses
+            </button>
+            <!-- Regenerate -->
+            <button @click=${this._regenerateBills} ?disabled=${this.regenerating}
+              class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-orange-500/20 disabled:opacity-50 cursor-pointer border-none transition-all">
+              ${iconZap('w-4 h-4')} ${this.regenerating ? 'Regenerating...' : 'Regenerate Bills'}
             </button>
             <!-- Generate -->
             <button @click=${this._generateBills} ?disabled=${this.generating}

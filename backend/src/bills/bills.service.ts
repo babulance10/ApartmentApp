@@ -98,6 +98,16 @@ export class BillsService {
     return created;
   }
 
+  async regenerateBills(apartmentId: string, month: number, year: number, maintenanceAmount?: number) {
+    // Delete existing bills for this month/year
+    await this.prisma.monthlyBill.deleteMany({
+      where: { flat: { apartmentId }, month, year },
+    });
+
+    // Regenerate bills with current water amounts
+    return this.generateMonthlyBills(apartmentId, month, year, maintenanceAmount);
+  }
+
   async create(dto: { flatId: string; month: number; year: number; maintenanceAmount?: number; waterAmount?: number; previousDue?: number }) {
     const maintenanceAmount = dto.maintenanceAmount ?? 2000;
     const waterAmount = dto.waterAmount ?? 0;

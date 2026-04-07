@@ -95,6 +95,11 @@ export class BillsController {
   @Post('recalculate-all')
   recalculateAll() { return this.billsService.recalculateAllStatuses(); }
 
+  @Post('regenerate')
+  regenerateBills(@Body() dto: { apartmentId: string; month: number; year: number; maintenanceAmount?: number }) {
+    return this.billsService.regenerateBills(dto.apartmentId, dto.month, dto.year, dto.maintenanceAmount);
+  }
+
   @Patch(':id')
   updateBill(@Param('id') id: string, @Body() dto: { maintenanceAmount?: number; waterAmount?: number; previousDue?: number }) {
     return this.billsService.updateBill(id, dto);
