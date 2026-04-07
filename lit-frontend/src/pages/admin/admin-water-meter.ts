@@ -117,30 +117,42 @@ export class AdminWaterMeter extends LitElement {
               </thead>
               <tbody class="divide-y divide-gray-50">
                 ${this.loading ? html`<tr><td colspan="5" class="px-4 py-4 text-gray-400">Loading...</td></tr>` :
-                  this.flats.map(flat => {
-                    const prev = parseFloat(this.readings[flat.id]?.prev || '0') || 0;
-                    const curr = parseFloat(this.readings[flat.id]?.curr || '0') || 0;
-                    const consumed = curr > prev ? curr - prev : 0;
-                    const savedReading = this.savedReadings.find((r: any) => r.flatId === flat.id);
-                    const amount = savedReading ? savedReading.waterAmount : 0;
-                    return html`
-                      <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 font-medium text-gray-900">
-                          <div class="flex items-center gap-2">${iconDroplets('w-4 h-4 text-blue-400')} Flat ${flat.flatNumber}</div>
-                        </td>
-                        <td class="px-4 py-2">
-                          <input type="number" .value=${this.readings[flat.id]?.prev || ''} @input=${(e: Event) => this._updateReading(flat.id, 'prev', (e.target as HTMLInputElement).value)}
-                            class="w-32 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
-                        </td>
-                        <td class="px-4 py-2">
-                          <input type="number" .value=${this.readings[flat.id]?.curr || ''} @input=${(e: Event) => this._updateReading(flat.id, 'curr', (e.target as HTMLInputElement).value)}
-                            class="w-32 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
-                        </td>
-                        <td class="px-4 py-3 text-gray-700">${consumed.toLocaleString('en-IN')}</td>
-                        <td class="px-4 py-3 font-medium text-gray-900">${formatCurrency(amount)}</td>
-                      </tr>
-                    `;
-                  })}
+                  html`
+                    ${this.flats.map(flat => {
+                      const prev = parseFloat(this.readings[flat.id]?.prev || '0') || 0;
+                      const curr = parseFloat(this.readings[flat.id]?.curr || '0') || 0;
+                      const consumed = curr > prev ? curr - prev : 0;
+                      const savedReading = this.savedReadings.find((r: any) => r.flatId === flat.id);
+                      const amount = savedReading ? savedReading.waterAmount : 0;
+                      return html`
+                        <tr class="hover:bg-gray-50">
+                          <td class="px-4 py-3 font-medium text-gray-900">
+                            <div class="flex items-center gap-2">${iconDroplets('w-4 h-4 text-blue-400')} Flat ${flat.flatNumber}</div>
+                          </td>
+                          <td class="px-4 py-2">
+                            <input type="number" .value=${this.readings[flat.id]?.prev || ''} @input=${(e: Event) => this._updateReading(flat.id, 'prev', (e.target as HTMLInputElement).value)}
+                              class="w-32 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                          </td>
+                          <td class="px-4 py-2">
+                            <input type="number" .value=${this.readings[flat.id]?.curr || ''} @input=${(e: Event) => this._updateReading(flat.id, 'curr', (e.target as HTMLInputElement).value)}
+                              class="w-32 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                          </td>
+                          <td class="px-4 py-3 text-gray-700">${consumed.toLocaleString('en-IN')}</td>
+                          <td class="px-4 py-3 font-medium text-gray-900">${formatCurrency(amount)}</td>
+                        </tr>
+                      `;
+                    })}
+                    <tr class="bg-blue-50 border-t-2 border-blue-200">
+                      <td class="px-4 py-3 font-bold text-gray-900">TOTAL</td>
+                      <td colspan="3" class="px-4 py-3 text-right font-medium text-gray-700">
+                        Total Consumed: ${this.savedReadings.reduce((sum: number, r: any) => sum + r.litersConsumed, 0).toLocaleString('en-IN')} L
+                      </td>
+                      <td class="px-4 py-3 font-bold text-lg text-blue-600">
+                        ${formatCurrency(this.savedReadings.reduce((sum: number, r: any) => sum + r.waterAmount, 0))}
+                      </td>
+                    </tr>
+                  `
+                }
               </tbody>
             </table>
           </div>
