@@ -79,6 +79,9 @@ export class WaterMeterService {
     });
 
     let updated = 0;
+    let noTankerData = 0;
+    const details: any[] = [];
+
     for (const reading of readings) {
       // Get tanker purchases for this month/year
       const purchases = await this.prisma.waterPurchase.findMany({
@@ -102,10 +105,26 @@ export class WaterMeterService {
             data: { pricePerLiter, waterAmount },
           });
           updated++;
+          details.push({
+            flat: reading.flat.flatNumber,
+            month: reading.month,
+            year: reading.year,
+            oldAmount: reading.waterAmount,
+            newAmount: waterAmount,
+            pricePerLiter: parseFloat(pricePerLiter.toFixed(4)),
+          });
         }
+      } else {
+        noTankerData++;
       }
     }
 
-    return { total: readings.length, updated };
+    return { 
+      total: readings.length, 
+      updated,
+      noTankerData,
+      message: `Updated ${updated} readings. ${noTankerData} readings skipped (no tanker data for that month/year)`,
+      details: details.slice(0, 10), // Show first 10 updates
+    };
   }
 }
