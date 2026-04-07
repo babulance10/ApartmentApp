@@ -16,6 +16,7 @@ export class AdminWaterMeter extends LitElement {
   @state() private loading = true;
   @state() private saving = false;
   @state() private recalculating = false;
+  @state() private creatingCommon = false;
 
   createRenderRoot() { return this; }
   connectedCallback() { super.connectedCallback(); this._loadFlats(); }
@@ -27,6 +28,24 @@ export class AdminWaterMeter extends LitElement {
     data.forEach((f: any) => { init[f.id] = { prev: '', curr: '' }; });
     this.readings = init;
     this._loadReadings();
+  }
+
+  private async _createCommonFlat() {
+    this.creatingCommon = true;
+    try {
+      const { data } = await api.post('/flats', {
+        flatNumber: 'Common',
+        floor: 0,
+        apartmentId: APARTMENT_ID,
+      });
+      this.flats = [...this.flats, data];
+      this.readings[data.id] = { prev: '', curr: '' };
+      alert('Common flat created successfully!');
+    } catch (error: any) {
+      alert(`Error creating Common flat: ${error.response?.data?.message || error.message}`);
+    } finally {
+      this.creatingCommon = false;
+    }
   }
 
   private async _loadReadings() {
@@ -97,6 +116,9 @@ export class AdminWaterMeter extends LitElement {
             <p class="text-gray-500 text-sm mt-1">Rate calculated from tanker purchases</p>
           </div>
           <div class="flex gap-2">
+            ${!this.flats.find((f: any) => f.flatNumber === 'Common') ? html`
+              <psa-button .loading=${this.creatingCommon} @click=${this._createCommonFlat} variant="secondary">+ Create Common Flat</psa-button>
+            ` : ''}
             <psa-button .loading=${this.recalculating} @click=${this._handleRecalculate} variant="secondary">Recalculate All</psa-button>
             <psa-button .loading=${this.saving} @click=${this._handleSave}>${iconSave('w-4 h-4')} Save Readings</psa-button>
           </div>
