@@ -265,6 +265,15 @@ export class BillsService {
   async getSummary(apartmentId: string, month: number, year: number) {
     const flats = await this.prisma.flat.findMany({ where: { apartmentId } });
     const flatIds = flats.map(f => f.id);
+    
+    // Get water readings from previous month (water is billed in the following month)
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear--;
+    }
+    
     const [bills, waterReadings] = await Promise.all([
       this.prisma.monthlyBill.findMany({
         where: { flatId: { in: flatIds }, month, year },
@@ -282,7 +291,7 @@ export class BillsService {
         orderBy: { flat: { flatNumber: 'asc' } },
       }),
       this.prisma.waterMeterReading.findMany({
-        where: { flatId: { in: flatIds }, month, year },
+        where: { flatId: { in: flatIds }, month: prevMonth, year: prevYear },
       }),
     ]);
     const billsWithLiters = bills.map(b => {

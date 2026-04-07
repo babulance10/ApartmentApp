@@ -83,14 +83,22 @@ export class AdminBills extends LitElement {
     window.open(`mailto:${tenant.email}?subject=${subject}&body=${body}`, '_blank');
   }
 
-  private _printBill(bill: any) {
+  private async _printBill(bill: any) {
     this.printBill = bill;
-    setTimeout(() => window.print(), 100);
+    await this.updateComplete;
+    setTimeout(() => {
+      window.print();
+      this.printBill = null;
+    }, 200);
   }
 
-  private _printAllBills() {
+  private async _printAllBills() {
     this.printingAll = true;
-    setTimeout(() => window.print(), 100);
+    await this.updateComplete;
+    setTimeout(() => {
+      window.print();
+      this.printingAll = false;
+    }, 200);
   }
 
   private _openWaBulkModal() {
@@ -564,9 +572,9 @@ export class AdminBills extends LitElement {
         <!-- ── Print Template ── -->
         ${this.printingAll ? html`
           <div class="print-only">
-            <div style="padding:40px;font-family:Arial,sans-serif;line-height:1.6">
+            <div style="padding:20px;font-family:Arial,sans-serif;line-height:1.4">
               <!-- Header -->
-              <div style="text-align:center;margin-bottom:30px;border-bottom:3px solid #000;padding-bottom:20px">
+              <div style="text-align:center;margin-bottom:15px;border-bottom:3px solid #000;padding-bottom:10px">
                 <h1 style="color:#006600;font-size:18px;margin:0;font-weight:bold">PRIMARK SREENIDHI APARTMENT ASSOCIATION, KONDAPUR,</h1>
                 <h1 style="color:#006600;font-size:18px;margin:5px 0 0 0;font-weight:bold">HYDERABAD</h1>
               </div>
@@ -597,25 +605,25 @@ export class AdminBills extends LitElement {
 
               <!-- Bill Table -->
               <p style="margin:20px 0 10px 0;font-size:13px;font-weight:bold;text-decoration:underline">Maintenance and Water Amount :</p>
-              <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:12px;border:1px solid #000">
+              <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:11px;border:1px solid #000">
                 <tr style="background:#f0f0f0">
-                  <th style="border:1px solid #000;padding:8px;text-align:left">Flats</th>
-                  <th style="border:1px solid #000;padding:8px;text-align:center">Maintenance Amount (Rs)</th>
-                  <th style="border:1px solid #000;padding:8px;text-align:center">${monthName(this.month)} Water Amount (Rs)</th>
-                  <th style="border:1px solid #000;padding:8px;text-align:center">Last Month Due (Rs)</th>
-                  <th style="border:1px solid #000;padding:8px;text-align:center">Liters Consumed</th>
-                  <th style="border:1px solid #000;padding:8px;text-align:center">Total (Rs)</th>
-                  <th style="border:1px solid #000;padding:8px;text-align:center">Signature</th>
+                  <th style="border:1px solid #000;padding:6px;text-align:left">Flats</th>
+                  <th style="border:1px solid #000;padding:6px;text-align:center">Maintenance<br/>Amount (Rs)</th>
+                  <th style="border:1px solid #000;padding:6px;text-align:center">${monthName(this.month === 1 ? 12 : this.month - 1)} Water<br/>Amount (Rs)</th>
+                  <th style="border:1px solid #000;padding:6px;text-align:center">Last Month<br/>Due (Rs)</th>
+                  <th style="border:1px solid #000;padding:6px;text-align:center">Liters<br/>Consumed</th>
+                  <th style="border:1px solid #000;padding:6px;text-align:center">Total (Rs)</th>
+                  <th style="border:1px solid #000;padding:6px;text-align:center">Signature</th>
                 </tr>
-                ${this.bills.map(bill => html`
+                ${this.bills.filter(bill => bill.flat?.flatNumber !== 'Common').map(bill => html`
                   <tr>
-                    <td style="border:1px solid #000;padding:8px">${bill.flat?.flatNumber}</td>
-                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.maintenanceAmount}</td>
-                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.waterAmount}</td>
-                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.previousDue > 0 ? bill.previousDue : 'Nil'}</td>
-                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.litersConsumed || '-'}</td>
-                    <td style="border:1px solid #000;padding:8px;text-align:center;font-weight:bold">${bill.totalAmount}</td>
-                    <td style="border:1px solid #000;padding:8px;text-align:center"></td>
+                    <td style="border:1px solid #000;padding:6px">${bill.flat?.flatNumber}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.maintenanceAmount}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.waterAmount}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.previousDue > 0 ? bill.previousDue : 'Nil'}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.litersConsumed || '-'}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold">${bill.totalAmount}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center"></td>
                   </tr>
                 `)}
               </table>
@@ -696,32 +704,24 @@ export class AdminBills extends LitElement {
 
         <style>
           .print-only {
-            position: fixed;
+            position: absolute;
             left: -9999px;
             top: 0;
+            visibility: hidden;
           }
           
           @media print {
-            body > *:not(.print-only) { 
-              display: none !important; 
+            body * { 
+              visibility: hidden !important; 
+            }
+            .print-only, .print-only * { 
+              visibility: visible !important;
             }
             .print-only { 
-              position: static !important;
-              left: auto !important;
-              display: block !important;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
               width: 100% !important;
-            }
-            .print-only * { 
-              display: revert !important; 
-            }
-            .print-only table { 
-              display: table !important; 
-            }
-            .print-only tr { 
-              display: table-row !important; 
-            }
-            .print-only td, .print-only th { 
-              display: table-cell !important; 
             }
           }
         </style>
