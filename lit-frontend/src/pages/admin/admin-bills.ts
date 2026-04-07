@@ -563,7 +563,7 @@ export class AdminBills extends LitElement {
 
         <!-- ── Print Template ── -->
         ${this.printingAll ? html`
-          <div style="display:none" class="print-only">
+          <div class="print-only">
             <div style="padding:40px;font-family:Arial,sans-serif;line-height:1.6">
               <!-- Header -->
               <div style="text-align:center;margin-bottom:30px;border-bottom:3px solid #000;padding-bottom:20px">
@@ -630,7 +630,7 @@ export class AdminBills extends LitElement {
         ` : ''}
 
         ${this.printBill && !this.printingAll ? html`
-          <div style="display:none" class="print-only">
+          <div class="print-only">
             <div style="max-width:900px;margin:0 auto;padding:40px;font-family:Arial,sans-serif;line-height:1.6">
               <!-- Header -->
               <div style="text-align:center;margin-bottom:30px;border-bottom:3px solid #000;padding-bottom:20px">
@@ -695,10 +695,34 @@ export class AdminBills extends LitElement {
         ` : ''}
 
         <style>
+          .print-only {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+          }
+          
           @media print {
-            body * { display: none !important; }
-            .print-only { display: block !important; }
-            .print-only * { display: block !important; }
+            body > *:not(.print-only) { 
+              display: none !important; 
+            }
+            .print-only { 
+              position: static !important;
+              left: auto !important;
+              display: block !important;
+              width: 100% !important;
+            }
+            .print-only * { 
+              display: revert !important; 
+            }
+            .print-only table { 
+              display: table !important; 
+            }
+            .print-only tr { 
+              display: table-row !important; 
+            }
+            .print-only td, .print-only th { 
+              display: table-cell !important; 
+            }
           }
         </style>
       </div>
