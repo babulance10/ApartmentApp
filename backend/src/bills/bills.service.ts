@@ -49,8 +49,15 @@ export class BillsService {
       });
       const previousDue = prevBill ? Math.max(0, prevBill.totalAmount - prevBill.paidAmount) : 0;
 
+      // Get water reading from previous month (water is billed in the following month)
+      let prevMonth = month - 1;
+      let prevYear = year;
+      if (prevMonth === 0) {
+        prevMonth = 12;
+        prevYear--;
+      }
       const waterReading = await this.prisma.waterMeterReading.findUnique({
-        where: { flatId_month_year: { flatId: flat.id, month, year } },
+        where: { flatId_month_year: { flatId: flat.id, month: prevMonth, year: prevYear } },
       });
       const waterAmount = waterReading ? waterReading.waterAmount : 0;
 
