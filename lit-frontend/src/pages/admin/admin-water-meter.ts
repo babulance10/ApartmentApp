@@ -12,6 +12,7 @@ export class AdminWaterMeter extends LitElement {
   @state() private year = currentMonthYear().year;
   @state() private flats: any[] = [];
   @state() private readings: Record<string, { prev: string; curr: string }> = {};
+  @state() private savedReadings: any[] = [];
   @state() private loading = true;
   @state() private saving = false;
   @state() private recalculating = false;
@@ -32,6 +33,7 @@ export class AdminWaterMeter extends LitElement {
     this.loading = true;
     try {
       const { data } = await api.get(`/water-meter/apartment?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`);
+      this.savedReadings = data;
       let prevMonth = this.month - 1, prevYear = this.year;
       if (prevMonth === 0) { prevMonth = 12; prevYear--; }
       const prevData = data.length === 0
@@ -119,7 +121,8 @@ export class AdminWaterMeter extends LitElement {
                     const prev = parseFloat(this.readings[flat.id]?.prev || '0') || 0;
                     const curr = parseFloat(this.readings[flat.id]?.curr || '0') || 0;
                     const consumed = curr > prev ? curr - prev : 0;
-                    const amount = 0; // Will be calculated by backend based on tanker purchases
+                    const savedReading = this.savedReadings.find((r: any) => r.flatId === flat.id);
+                    const amount = savedReading ? savedReading.waterAmount : 0;
                     return html`
                       <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 font-medium text-gray-900">
