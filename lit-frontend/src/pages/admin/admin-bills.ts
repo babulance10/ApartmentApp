@@ -25,6 +25,7 @@ export class AdminBills extends LitElement {
   @state() private bulkDropdown = false;
   @state() private waBulkModal = false;
   @state() private waSentFlats: Set<string> = new Set();
+  @state() private printBill: any = null;
 
   createRenderRoot() { return this; }
   connectedCallback() { super.connectedCallback(); this._load(); }
@@ -78,6 +79,11 @@ export class AdminBills extends LitElement {
       `Balance Due: Rs.${balance}\n\nPlease make the payment at your earliest convenience.\n\nRegards,\nPSA Association`
     );
     window.open(`mailto:${tenant.email}?subject=${subject}&body=${body}`, '_blank');
+  }
+
+  private _printBill(bill: any) {
+    this.printBill = bill;
+    setTimeout(() => window.print(), 100);
   }
 
   private _openWaBulkModal() {
@@ -343,6 +349,8 @@ export class AdminBills extends LitElement {
                             title="WhatsApp" class="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded cursor-pointer bg-transparent border-none transition-all">${iconMessageCircle('w-3 h-3')}</button>
                           <button @click=${() => this._sendEmail(bill)}
                             title="Email" class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer bg-transparent border-none transition-all">${iconMail('w-3 h-3')}</button>
+                          <button @click=${() => this._printBill(bill)}
+                            title="Print" class="p-1 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded cursor-pointer bg-transparent border-none transition-all">🖨️</button>
                         </div>
                       </td>
                     </tr>
@@ -522,6 +530,82 @@ export class AdminBills extends LitElement {
             </div>
           </div>
         </psa-modal>
+
+        <!-- ── Print Template ── -->
+        ${this.printBill ? html`
+          <div style="display:none" class="print-only">
+            <div style="max-width:900px;margin:0 auto;padding:40px;font-family:Arial,sans-serif;line-height:1.6">
+              <!-- Header -->
+              <div style="text-align:center;margin-bottom:30px;border-bottom:3px solid #000;padding-bottom:20px">
+                <h1 style="color:#006600;font-size:18px;margin:0;font-weight:bold">PRIMARK SREENIDHI APARTMENT ASSOCIATION, KONDAPUR,</h1>
+                <h1 style="color:#006600;font-size:18px;margin:5px 0 0 0;font-weight:bold">HYDERABAD</h1>
+              </div>
+
+              <!-- Greeting -->
+              <div style="margin-bottom:20px">
+                <p style="margin:0;font-size:14px"><strong>To,</strong></p>
+                <p style="margin:5px 0;font-size:14px">All the Owners and Residents of PSA</p>
+                <p style="margin:10px 0 0 0;font-size:16px;font-weight:bold">Namaste.</p>
+                <p style="text-align:right;font-size:13px;margin:10px 0 0 0">Date: ${new Date().toLocaleDateString('en-IN')}</p>
+              </div>
+
+              <!-- Salutation -->
+              <p style="margin:20px 0;font-size:14px">Dear Sir/Madam,</p>
+              <p style="margin:10px 0;font-size:14px;text-align:center;font-weight:bold;text-decoration:underline">${monthName(this.month)} ${this.year} Maintenance</p>
+
+              <!-- Payment Instructions -->
+              <p style="margin:15px 0;font-size:13px">You can transfer the amount to below account.</p>
+              <div style="margin:15px 0;font-size:13px">
+                <p style="margin:5px 0"><strong>1. UPI Pay</strong></p>
+                <p style="margin:5px 0 5px 20px">Mobile Number : 7093991333</p>
+              </div>
+
+              <!-- Note -->
+              <p style="margin:15px 0;font-size:12px;font-weight:bold">
+                <strong>Note:</strong> Please include the <strong>FLAT NUMBER</strong> in the payment description. Kindly <u>sign</u> after completing the payment.
+              </p>
+
+              <!-- Bill Table -->
+              <p style="margin:20px 0 10px 0;font-size:13px;font-weight:bold;text-decoration:underline">Maintenance and Water Amount :</p>
+              <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:12px">
+                <tr style="background:#f0f0f0;border:1px solid #000">
+                  <th style="border:1px solid #000;padding:8px;text-align:left">Flat</th>
+                  <th style="border:1px solid #000;padding:8px;text-align:center">Maintenance Amount (Rs)</th>
+                  <th style="border:1px solid #000;padding:8px;text-align:center">${monthName(this.month)} Water (Rs)</th>
+                  <th style="border:1px solid #000;padding:8px;text-align:center">Last Month Due (Rs)</th>
+                  <th style="border:1px solid #000;padding:8px;text-align:center">Liters Consumed</th>
+                  <th style="border:1px solid #000;padding:8px;text-align:center">Total (Rs)</th>
+                  <th style="border:1px solid #000;padding:8px;text-align:center">Signature</th>
+                </tr>
+                ${this.bills.map(bill => html`
+                  <tr style="border:1px solid #000">
+                    <td style="border:1px solid #000;padding:8px">${bill.flat?.flatNumber}</td>
+                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.maintenanceAmount}</td>
+                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.waterAmount}</td>
+                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.previousDue > 0 ? bill.previousDue : 'Nil'}</td>
+                    <td style="border:1px solid #000;padding:8px;text-align:center">${bill.litersConsumed || '-'}</td>
+                    <td style="border:1px solid #000;padding:8px;text-align:center;font-weight:bold">${bill.totalAmount}</td>
+                    <td style="border:1px solid #000;padding:8px;text-align:center"></td>
+                  </tr>
+                `)}
+              </table>
+
+              <!-- Footer -->
+              <div style="margin-top:40px;text-align:center;font-size:13px">
+                <p style="margin:20px 0">With Best Regards,</p>
+                <p style="margin:0">PSA Association, Kondapur, Hyderabad</p>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        <style>
+          @media print {
+            body * { display: none !important; }
+            .print-only { display: block !important; }
+            .print-only * { display: block !important; }
+          }
+        </style>
       </div>
     `;
   }
