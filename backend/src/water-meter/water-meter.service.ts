@@ -72,4 +72,40 @@ export class WaterMeterService {
       orderBy: { flat: { flatNumber: 'asc' } },
     });
   }
+
+  async recalculateAll() {
+    const readings = await this.prisma.waterMeterReading.findMany({
+      include: { flat: true },
+    });
+
+    let updated = 0;
+    for (const reading of readings) {
+      // Get tanker purchases for this month/year
+      const purchases = await this.prisma.waterPurchase.findMany({
+        where: {
+          apartmentId: reading.flat.apartmentId,
+          month: reading.month,
+          year: reading.year,
+        },
+      });
+
+      if (purchases.length > 0) {
+        const totalLiters = purchases.reduce((sum, p) => sum + p.capacityLiters, 0);
+        const totalCost = purchases.reduce((sum, p) => sum + p.amountPaid, 0);
+        const pricePerLiter = totalLiters > 0 ? totalCost / totalLiters : 0.088;
+        const waterAmount = Math.round(reading.litersConsumed * pricePerLiter);
+
+        // Update if different
+        if (reading.pricePerLiter !== pricePerLiter || reading.waterAmount !== waterAmount) {
+          await this.prisma.waterMeterReading.update({
+            where: { id: reading.id },
+            data: { pricePerLiter, waterAmount },
+          });
+          updated++;
+        }
+      }
+    }
+
+    return { total: readings.length, updated };
+  }
 }

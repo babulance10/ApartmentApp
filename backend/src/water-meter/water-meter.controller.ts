@@ -25,4 +25,7 @@ export class WaterMeterController {
 
   @Post('bulk')
   bulkUpsert(@Body() dto: { readings: any[] }) { return this.waterMeterService.bulkUpsert(dto.readings); }
+
+  @Post('recalculate')
+  recalculateAll() { return this.waterMeterService.recalculateAll(); }
 }
