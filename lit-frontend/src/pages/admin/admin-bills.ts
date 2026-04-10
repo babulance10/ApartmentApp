@@ -48,22 +48,86 @@ export class AdminBills extends LitElement {
     }
   }
 
+  private _getBestTenant(bill: any) {
+    const tenancies: any[] = bill.flat?.tenancies || [];
+    // Prefer tenancy with a phone number AND a real name (not seed "Resident XXX")
+    return (
+      tenancies.find(t => t.user?.phone && !/^Resident \d+$/i.test(t.user?.name || '')) ||
+      tenancies.find(t => t.user?.phone) ||
+      tenancies[0]
+    )?.user;
+  }
+
   private _sendWhatsApp(bill: any) {
-    const tenant = bill.flat?.tenancies?.[0]?.user;
+    const tenant = this._getBestTenant(bill);
     if (!tenant?.phone) { alert("No phone number for this flat's tenant."); return; }
     const phone = tenant.phone.replace(/\D/g, '');
     const dialPhone = phone.startsWith('91') ? phone : `91${phone}`;
     const balance = bill.totalAmount - bill.paidAmount;
-    const msg = encodeURIComponent(
-      `Dear ${tenant.name},\n\nYour maintenance bill for ${monthName(this.month)} ${this.year}:\n` +
-      `• Flat: ${bill.flat?.flatNumber}\n• Maintenance: ₹${bill.maintenanceAmount}\n` +
-      (bill.waterAmount > 0 ? `• Water: ₹${bill.waterAmount}\n` : '') +
-      (bill.previousDue > 0 ? `• Previous Due: ₹${bill.previousDue}\n` : '') +
-      `• Total: ₹${bill.totalAmount}\n` +
-      (bill.paidAmount > 0 ? `• Paid: ₹${bill.paidAmount}\n` : '') +
-      `• Balance Due: ₹${balance}\n\nPlease pay via UPI. Thank you!`
-    );
+    const prevDue = bill.previousDue ?? 0;
+    const lines = [
+      `*Primark Sreenidhi Apartments*`,
+      ``,
+      `Dear ${tenant.name},`,
+      ``,
+      `Your maintenance bill for *${monthName(this.month)} ${this.year}* is ready.`,
+      ``,
+      `*Flat ${bill.flat?.flatNumber}*`,
+      `Maintenance: Rs.${bill.maintenanceAmount}`,
+      ...(bill.waterAmount > 0 ? [`Water: Rs.${bill.waterAmount}`] : []),
+      ...(prevDue > 0 ? [`Previous Due: Rs.${prevDue}`] : []),
+      ...(prevDue < 0 ? [`Credit Carried Forward: -Rs.${Math.abs(prevDue)}`] : []),
+      ``,
+      `*Total: Rs.${bill.totalAmount}*`,
+      ...(bill.paidAmount > 0 ? [`Paid: Rs.${bill.paidAmount}`] : []),
+      balance > 0 ? `*Balance Due: Rs.${balance}*` : `*Credit Balance: Rs.${Math.abs(balance)}* (adjusted next month)`,
+      ``,
+      `Please pay via UPI. Thank you!`,
+      ``,
+      `Track your bills online: gruha.sarvavidha.in`,
+    ];
+    const msg = encodeURIComponent(lines.join('\n'));
     window.open(`https://wa.me/${dialPhone}?text=${msg}`, '_blank');
+  }
+
+  private _sendLaunchAnnouncement(phone: string) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const dialPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+    const lines = [
+      `*Primark Sreenidhi Apartments*`,
+      ``,
+      `We are excited to announce - our Apartment Portal is now LIVE!`,
+      ``,
+      `You can now view your maintenance bills, payment history, and dues online - anytime, anywhere.`,
+      ``,
+      `Visit us at: https://gruha.sarvavidha.in`,
+      ``,
+      `What you can do:`,
+      `- View monthly bills`,
+      `- Check payment history`,
+      `- Track water usage`,
+      ``,
+      `This is a *beta launch* - we appreciate your patience as we continue to improve.`,
+      ``,
+      `For any queries, contact the PSA office.`,
+      ``,
+      `Thank you!`,
+    ];
+    const msg = encodeURIComponent(lines.join('\n'));
+    window.open(`https://wa.me/${dialPhone}?text=${msg}`, '_blank');
+  }
+
+  private async _sendAnnouncementToAll() {
+    this.bulkDropdown = false;
+    if (!confirm('Send website launch announcement to ALL tenants with a phone number?')) return;
+    const tenants = this.bills
+      .map(b => this._getBestTenant(b))
+      .filter(u => u?.phone);
+    const unique = [...new Map(tenants.map(u => [u.phone, u])).values()];
+    for (const user of unique) {
+      this._sendLaunchAnnouncement(user.phone);
+      await new Promise(r => setTimeout(r, 800));
+    }
   }
 
   private _sendEmail(bill: any) {
@@ -222,6 +286,10 @@ export class AdminBills extends LitElement {
                   <button @click=${this._bulkSendEmail} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer bg-transparent border-none border-t border-gray-100 transition-colors">
                     <div class="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">${iconMail('w-4 h-4 text-blue-600')}</div>
                     <div class="text-left"><p class="font-medium text-gray-800">Email</p><p class="text-xs text-gray-400">Send all via SMTP</p></div>
+                  </button>
+                  <button @click=${this._sendAnnouncementToAll} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 cursor-pointer bg-transparent border-none border-t border-gray-100 transition-colors">
+                    <div class="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">🚀</div>
+                    <div class="text-left"><p class="font-medium text-gray-800">Launch Announcement</p><p class="text-xs text-gray-400">Announce gruha.sarvavidha.in</p></div>
                   </button>
                 </div>
                 <div class="fixed inset-0 z-10" @click=${() => this.bulkDropdown = false}></div>

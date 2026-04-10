@@ -49,7 +49,7 @@ export class BillsService {
         where: { flatId: flat.id },
         orderBy: [{ year: 'desc' }, { month: 'desc' }],
       });
-      const previousDue = prevBill ? Math.max(0, prevBill.totalAmount - prevBill.paidAmount) : 0;
+      const previousDue = prevBill ? (prevBill.totalAmount - prevBill.paidAmount) : 0;
 
       // Get water reading from previous month (water is billed in the following month)
       let prevMonth = month - 1;
@@ -83,7 +83,7 @@ export class BillsService {
         },
       });
       const creditAmount = pendingContributions.reduce((s, c) => s + c.amount, 0);
-      const netPreviousDue = Math.max(0, previousDue - creditAmount);
+      const netPreviousDue = previousDue - creditAmount;
 
       const totalAmount = flatMaintenance + waterAmount + netPreviousDue;
 
