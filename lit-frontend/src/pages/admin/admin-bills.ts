@@ -25,6 +25,8 @@ export class AdminBills extends LitElement {
   @state() private bulkDropdown = false;
   @state() private waBulkModal = false;
   @state() private waSentFlats: Set<string> = new Set();
+  @state() private announcementModal = false;
+  @state() private announcementSentPhones: Set<string> = new Set();
   @state() private printBill: any = null;
   @state() private regenerating = false;
   @state() private printingAll = false;
@@ -117,17 +119,36 @@ export class AdminBills extends LitElement {
     window.open(`https://wa.me/${dialPhone}?text=${msg}`, '_blank');
   }
 
-  private async _sendAnnouncementToAll() {
+  private _openAnnouncementModal() {
     this.bulkDropdown = false;
-    if (!confirm('Send website launch announcement to ALL tenants with a phone number?')) return;
-    const tenants = this.bills
-      .map(b => this._getBestTenant(b))
-      .filter(u => u?.phone);
-    const unique = [...new Map(tenants.map(u => [u.phone, u])).values()];
-    for (const user of unique) {
-      this._sendLaunchAnnouncement(user.phone);
+    this.announcementSentPhones = new Set();
+    this.announcementModal = true;
+  }
+
+  private _sendAnnouncementTo(phone: string) {
+    this._sendLaunchAnnouncement(phone);
+    this.announcementSentPhones = new Set([...this.announcementSentPhones, phone]);
+  }
+
+  private async _sendAllAnnouncements() {
+    const targets = this._announcementTargets.filter(u => !this.announcementSentPhones.has(u.phone));
+    for (const user of targets) {
+      this._sendAnnouncementTo(user.phone);
       await new Promise(r => setTimeout(r, 800));
     }
+  }
+
+  private get _announcementTargets(): { name: string; phone: string; flat: string }[] {
+    const seen = new Set<string>();
+    const results: { name: string; phone: string; flat: string }[] = [];
+    for (const bill of this.bills) {
+      const user = this._getBestTenant(bill);
+      if (user?.phone && !seen.has(user.phone)) {
+        seen.add(user.phone);
+        results.push({ name: user.name, phone: user.phone, flat: bill.flat?.flatNumber });
+      }
+    }
+    return results;
   }
 
   private _sendEmail(bill: any) {
@@ -287,7 +308,7 @@ export class AdminBills extends LitElement {
                     <div class="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">${iconMail('w-4 h-4 text-blue-600')}</div>
                     <div class="text-left"><p class="font-medium text-gray-800">Email</p><p class="text-xs text-gray-400">Send all via SMTP</p></div>
                   </button>
-                  <button @click=${this._sendAnnouncementToAll} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 cursor-pointer bg-transparent border-none border-t border-gray-100 transition-colors">
+                  <button @click=${() => this._openAnnouncementModal()} class="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 cursor-pointer bg-transparent border-none border-t border-gray-100 transition-colors">
                     <div class="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">🚀</div>
                     <div class="text-left"><p class="font-medium text-gray-800">Launch Announcement</p><p class="text-xs text-gray-400">Announce gruha.sarvavidha.in</p></div>
                   </button>
@@ -590,6 +611,49 @@ export class AdminBills extends LitElement {
           </div>
         </psa-modal>
 
+        <!-- ── Launch Announcement Modal ── -->
+        <psa-modal ?open=${this.announcementModal} modalTitle="Launch Announcement — Bulk Send" size="md" @close=${() => this.announcementModal = false}>
+          <div class="space-y-3">
+            <div class="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 mb-2">
+              <span style="font-size:20px">🚀</span>
+              <div>
+                <p class="text-sm font-medium text-purple-800">Click "Send" next to each flat to open WhatsApp</p>
+                <p class="text-xs text-purple-600">Sends the portal launch announcement to each tenant. Tap Send in WhatsApp, then return for the next one.</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-gray-500 px-1">
+              <span>${this.announcementSentPhones.size} of ${this._announcementTargets.length} sent</span>
+              <span class="font-medium">${this._announcementTargets.length} tenants with phone numbers</span>
+            </div>
+            <div class="max-h-80 overflow-y-auto space-y-1.5">
+              ${this._announcementTargets.map(({ name, phone, flat }) => {
+                const sent = this.announcementSentPhones.has(phone);
+                return html`
+                  <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl border ${sent ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'} transition-all">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">${flat}</div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-gray-900 truncate">${name}</p>
+                      <p class="text-xs text-gray-400">${phone}</p>
+                    </div>
+                    ${sent
+                      ? html`<span class="text-xs text-green-600 bg-green-100 px-2.5 py-1 rounded-lg font-semibold">✓ Sent</span>`
+                      : html`<button @click=${() => this._sendAnnouncementTo(phone)}
+                          class="text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded-lg cursor-pointer border-none shadow-sm transition-all">Send</button>`}
+                  </div>
+                `;
+              })}
+            </div>
+            <div class="flex items-center justify-between pt-2">
+              <button @click=${() => this._sendAllAnnouncements()}
+                class="text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-xl cursor-pointer border-none shadow-sm transition-all"
+                ?disabled=${this._announcementTargets.length === 0}>
+                Send All (${this._announcementTargets.length} tenants)
+              </button>
+              <psa-button variant="secondary" @click=${() => this.announcementModal = false}>Close</psa-button>
+            </div>
+          </div>
+        </psa-modal>
+
         <!-- ── WhatsApp Bulk Send Modal ── -->
         <psa-modal ?open=${this.waBulkModal} modalTitle="WhatsApp Bulk Send — ${monthName(this.month)} ${this.year}" size="md" @close=${() => this.waBulkModal = false}>
           <div class="space-y-3">
@@ -673,7 +737,16 @@ export class AdminBills extends LitElement {
 
               <!-- Bill Table -->
               <p style="margin:20px 0 10px 0;font-size:13px;font-weight:bold;text-decoration:underline">Maintenance and Water Amount :</p>
-              <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:11px;border:1px solid #000">
+              <table style="width:auto;border-collapse:collapse;margin:10px 0;font-size:11px;border:1px solid #000;table-layout:fixed">
+                <colgroup>
+                  <col style="width:50px"/>
+                  <col style="width:100px"/>
+                  <col style="width:100px"/>
+                  <col style="width:90px"/>
+                  <col style="width:80px"/>
+                  <col style="width:80px"/>
+                  <col style="width:80px"/>
+                </colgroup>
                 <tr style="background:#f0f0f0">
                   <th style="border:1px solid #000;padding:6px;text-align:left">Flats</th>
                   <th style="border:1px solid #000;padding:6px;text-align:center">Maintenance<br/>Amount (Rs)</th>
@@ -688,7 +761,7 @@ export class AdminBills extends LitElement {
                     <td style="border:1px solid #000;padding:6px">${bill.flat?.flatNumber}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center">${bill.maintenanceAmount}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center">${bill.waterAmount}</td>
-                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.previousDue > 0 ? bill.previousDue : 'Nil'}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.previousDue > 0 ? bill.previousDue : (bill.previousDue < 0 ? 'CR ' + Math.abs(bill.previousDue) : 'Nil')}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center">${bill.litersConsumed ? bill.litersConsumed * 10 : '-'}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold">${bill.totalAmount}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center"></td>
@@ -740,7 +813,16 @@ export class AdminBills extends LitElement {
 
               <!-- Bill Table -->
               <p style="margin:20px 0 10px 0;font-size:13px;font-weight:bold;text-decoration:underline">Maintenance and Water Amount :</p>
-              <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:12px">
+              <table style="width:auto;border-collapse:collapse;margin:10px 0;font-size:12px;table-layout:fixed">
+                <colgroup>
+                  <col style="width:60px"/>
+                  <col style="width:120px"/>
+                  <col style="width:120px"/>
+                  <col style="width:110px"/>
+                  <col style="width:100px"/>
+                  <col style="width:90px"/>
+                  <col style="width:90px"/>
+                </colgroup>
                 <tr style="background:#f0f0f0;border:1px solid #000">
                   <th style="border:1px solid #000;padding:8px;text-align:left">Flat</th>
                   <th style="border:1px solid #000;padding:8px;text-align:center">Maintenance Amount (Rs)</th>
@@ -754,7 +836,7 @@ export class AdminBills extends LitElement {
                   <td style="border:1px solid #000;padding:8px">${this.printBill.flat?.flatNumber}</td>
                   <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.maintenanceAmount}</td>
                   <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.waterAmount}</td>
-                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.previousDue > 0 ? this.printBill.previousDue : 'Nil'}</td>
+                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.previousDue > 0 ? this.printBill.previousDue : (this.printBill.previousDue < 0 ? 'CR ' + Math.abs(this.printBill.previousDue) : 'Nil')}</td>
                   <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.litersConsumed || '-'}</td>
                   <td style="border:1px solid #000;padding:8px;text-align:center;font-weight:bold">${this.printBill.totalAmount}</td>
                   <td style="border:1px solid #000;padding:8px;text-align:center"></td>

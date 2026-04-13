@@ -42,8 +42,7 @@ export class BillsService {
     const amount = maintenanceAmount ?? (apartment as any)?.maintenanceAmount ?? 2000;
     const flats = await this.prisma.flat.findMany({ where: { apartmentId } });
     const created: any[] = [];
-    let commonWaterAmount = 0;
-    
+
     for (const flat of flats) {
       const prevBill = await this.prisma.monthlyBill.findFirst({
         where: { flatId: flat.id },
@@ -67,10 +66,6 @@ export class BillsService {
       const isCommon = flat.flatNumber === 'Common';
       const flatMaintenance = isCommon ? 0 : amount;
       
-      if (isCommon && waterAmount > 0) {
-        commonWaterAmount = waterAmount;
-      }
-
       // Auto-deduct unapplied contributions from previous months
       const pendingContributions = await this.prisma.flatContribution.findMany({
         where: {
@@ -106,33 +101,56 @@ export class BillsService {
       }
     }
     
-    // Create expense for Common flat water amount
-    if (commonWaterAmount > 0) {
-      const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'];
-      await this.prisma.expense.create({
-        data: {
-          apartmentId,
-          category: 'Water',
-          description: `Common Area Water - ${MONTH_NAMES[month]} ${year}`,
-          amount: commonWaterAmount,
-          month,
-          year,
-          expenseDate: new Date(year, month - 1, 1),
-        },
-      });
-    }
-    
     return created;
   }
 
   async regenerateBills(apartmentId: string, month: number, year: number, maintenanceAmount?: number) {
-    // Delete existing bills for this month/year
+    // Step 1: Find current bills being deleted and clear their linked contributions
+    const billsToDelete = await this.prisma.monthlyBill.findMany({
+      where: { flat: { apartmentId }, month, year },
+      select: { id: true },
+    });
+    const billIds = billsToDelete.map(b => b.id);
+    if (billIds.length > 0) {
+      await this.prisma.flatContribution.updateMany({
+        where: { appliedToBillId: { in: billIds } },
+        data: { appliedToBillId: null },
+      });
+    }
+
+    // Step 2: Find all contributions for this apartment's flats that were for
+    // prior months and have a stale appliedToBillId (pointing to a deleted bill)
+    const flats = await this.prisma.flat.findMany({ where: { apartmentId }, select: { id: true } });
+    const flatIds = flats.map(f => f.id);
+    const priorContributions = await this.prisma.flatContribution.findMany({
+      where: {
+        flatId: { in: flatIds },
+        appliedToBillId: { not: null },
+        OR: [
+          { year: { lt: year } },
+          { year, month: { lt: month } },
+        ],
+      },
+    });
+    // Clear any that point to a bill that no longer exists
+    const staleIds: string[] = [];
+    for (const c of priorContributions) {
+      const bill = await this.prisma.monthlyBill.findUnique({ where: { id: c.appliedToBillId! } });
+      if (!bill) staleIds.push(c.id);
+    }
+    if (staleIds.length > 0) {
+      await this.prisma.flatContribution.updateMany({
+        where: { id: { in: staleIds } },
+        data: { appliedToBillId: null },
+      });
+    }
+
+    // Step 3: Delete existing bills for this month/year
     await this.prisma.monthlyBill.deleteMany({
       where: { flat: { apartmentId }, month, year },
     });
 
-    // Regenerate bills with current water amounts
+    // Step 4: Regenerate — will now pick up all pending contributions
     return this.generateMonthlyBills(apartmentId, month, year, maintenanceAmount);
   }
 
@@ -191,9 +209,10 @@ export class BillsService {
 
   async getAllTimeTotals(apartmentId: string) {
     // Authoritative total from Spend Details sheet (Jun 2020 – Mar 2026)
+    // Water is excluded: it is a pass-through cost collected from flat bills, not a net apartment expense
     const SPEND_DETAILS_TOTAL_RECEIVED = 1651504;
     const expensesResult = await this.prisma.expense.aggregate({
-      where: { apartmentId },
+      where: { apartmentId, NOT: { category: 'Water' } },
       _sum: { amount: true },
     });
     const totalExpenses = expensesResult._sum.amount ?? 0;

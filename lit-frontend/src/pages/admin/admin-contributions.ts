@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { iconPlus, iconTrash2 } from '../../lib/icons.js';
 import { formatCurrency, monthName, currentMonthYear, MONTHS } from '../../lib/utils.js';
 import api from '../../lib/api.js';
+import { getUser, isAdmin } from '../../lib/auth.js';
 
 const APARTMENT_ID = 'psa-main';
 
@@ -17,6 +18,12 @@ export class AdminContributions extends LitElement {
   @state() private modal = false;
   @state() private saving = false;
   @state() private form: any = { flatId: '', userId: '', month: currentMonthYear().month, year: currentMonthYear().year, type: 'WATER', amount: '', description: '' };
+  @state() private applyModal = false;
+  @state() private applyContribution: any = null;
+  @state() private applyMonth = currentMonthYear().month;
+  @state() private applyYear = currentMonthYear().year;
+  @state() private applying = false;
+  @state() private currentUser = getUser();
 
   createRenderRoot() { return this; }
   connectedCallback() {
@@ -51,6 +58,27 @@ export class AdminContributions extends LitElement {
   private async _handleDelete(id: string) {
     if (!confirm('Delete this contribution?')) return;
     await api.delete(`/contributions/${id}`); await this._load();
+  }
+
+  private _openApplyModal(c: any) {
+    this.applyContribution = c;
+    const nextMonth = c.month === 12 ? 1 : c.month + 1;
+    const nextYear = c.month === 12 ? c.year + 1 : c.year;
+    this.applyMonth = nextMonth;
+    this.applyYear = nextYear;
+    this.applyModal = true;
+  }
+
+  private async _handleApply() {
+    if (!this.applyContribution) return;
+    this.applying = true;
+    try {
+      await api.post(`/contributions/${this.applyContribution.id}/apply`, { month: this.applyMonth, year: this.applyYear });
+      await this._load();
+      this.applyModal = false;
+      this.applyContribution = null;
+    } catch (e: any) { alert(e.response?.data?.message || 'Error applying contribution'); }
+    this.applying = false;
   }
 
   private _uf(key: string, val: any) { this.form = { ...this.form, [key]: val }; }
@@ -95,13 +123,49 @@ export class AdminContributions extends LitElement {
                       <td class="px-4 py-3 font-semibold text-green-700">${formatCurrency(c.amount)}</td>
                       <td class="px-4 py-3 text-gray-500 max-w-xs truncate">${c.description || '—'}</td>
                       <td class="px-4 py-3">${c.appliedToBillId ? html`<span class="text-xs text-green-600 font-medium">✓ Applied</span>` : html`<span class="text-xs text-orange-500">Pending</span>`}</td>
-                      <td class="px-4 py-3">${!c.appliedToBillId ? html`<button @click=${() => this._handleDelete(c.id)} class="p-1 text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none">${iconTrash2('w-4 h-4')}</button>` : ''}</td>
+                      <td class="px-4 py-3">
+                        ${!c.appliedToBillId && isAdmin(this.currentUser) ? html`
+                          <div class="flex items-center gap-1">
+                            <button @click=${() => this._openApplyModal(c)}
+                              class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded cursor-pointer border-none transition-all">
+                              ✓ Apply
+                            </button>
+                            <button @click=${() => this._handleDelete(c.id)} class="p-1 text-red-400 hover:text-red-600 cursor-pointer bg-transparent border-none">${iconTrash2('w-4 h-4')}</button>
+                          </div>` : ''}
+                      </td>
                     </tr>
                   `)}
               </tbody>
             </table>
           </div>
         </div>
+
+        <psa-modal ?open=${this.applyModal} modalTitle="Apply Credit to Bill" size="sm" @close=${() => { this.applyModal = false; this.applyContribution = null; }}>
+          <div class="space-y-4">
+            ${this.applyContribution ? html`
+              <div class="bg-blue-50 rounded-lg px-3 py-2 text-sm">
+                <p class="font-medium text-blue-800">Flat ${this.applyContribution.flat?.flatNumber} — ${formatCurrency(this.applyContribution.amount)}</p>
+                <p class="text-blue-600 text-xs mt-0.5">${this.applyContribution.description || this.applyContribution.type}</p>
+              </div>
+              <p class="text-xs text-gray-500">Select the bill month/year to apply this credit to:</p>
+              <div class="grid grid-cols-2 gap-3">
+                <psa-select label="Month" .value=${String(this.applyMonth)} @value-changed=${(e: CustomEvent) => this.applyMonth = +e.detail}>
+                  ${MONTHS.map((m, i) => html`<option value=${i + 1}>${m}</option>`)}
+                </psa-select>
+                <psa-select label="Year" .value=${String(this.applyYear)} @value-changed=${(e: CustomEvent) => this.applyYear = +e.detail}>
+                  ${this._years.map(y => html`<option value=${y}>${y}</option>`)}
+                </psa-select>
+              </div>
+              <p class="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">
+                ⚠ The credit will be deducted from the selected month's bill previous due.
+              </p>
+            ` : ''}
+            <div class="flex gap-2 justify-end pt-2">
+              <psa-button variant="secondary" @click=${() => { this.applyModal = false; this.applyContribution = null; }}>Cancel</psa-button>
+              <psa-button .loading=${this.applying} @click=${this._handleApply}>Apply Credit</psa-button>
+            </div>
+          </div>
+        </psa-modal>
 
         <psa-modal ?open=${this.modal} modalTitle="Add Contribution" size="sm" @close=${() => this.modal = false}>
           <div class="space-y-4">

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ContributionsService } from './contributions.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -40,6 +40,19 @@ export class ContributionsController {
     description?: string;
   }) {
     return this.contributionsService.create(dto);
+  }
+
+  @Post(':id/apply')
+  applyToExistingBill(
+    @Param('id') id: string,
+    @Body() dto: { month: number; year: number },
+  ) {
+    return this.contributionsService.applyToExistingBill(id, dto.month, dto.year);
+  }
+
+  @Post(':id/reset')
+  resetApplied(@Param('id') id: string) {
+    return this.contributionsService.resetApplied(id);
   }
 
   @Delete(':id')
