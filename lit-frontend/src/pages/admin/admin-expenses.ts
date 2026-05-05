@@ -17,9 +17,16 @@ export class AdminExpenses extends LitElement {
   @state() private editExp: any = null;
   @state() private form = { category: 'Security', description: '', amount: '', expenseDate: '' };
   @state() private saving = false;
+  @state() private templates: {category: string; description: string; amount: string}[] = [];
+  @state() private showTemplateList = false;
 
   createRenderRoot() { return this; }
-  connectedCallback() { super.connectedCallback(); this._load(); }
+  connectedCallback() {
+    super.connectedCallback();
+    this._load();
+    const saved = localStorage.getItem('expense-templates');
+    this.templates = saved ? JSON.parse(saved) : [];
+  }
 
   private async _load() {
     this.loading = true;
@@ -64,6 +71,26 @@ export class AdminExpenses extends LitElement {
 
   private _uf(key: string, val: string) { this.form = { ...this.form, [key]: val }; }
   private _years = [2024, 2025, 2026, 2027];
+
+  private _saveTemplate() {
+    if (!this.form.description || !this.form.amount) return;
+    const t = { category: this.form.category, description: this.form.description, amount: this.form.amount };
+    const updated = [...this.templates, t];
+    this.templates = updated;
+    localStorage.setItem('expense-templates', JSON.stringify(updated));
+    alert(`Template "${t.description}" saved!`);
+  }
+
+  private _loadTemplate(t: {category: string; description: string; amount: string}) {
+    this.form = { ...this.form, category: t.category, description: t.description, amount: t.amount };
+    this.showTemplateList = false;
+  }
+
+  private _deleteTemplate(idx: number) {
+    const updated = this.templates.filter((_, i) => i !== idx);
+    this.templates = updated;
+    localStorage.setItem('expense-templates', JSON.stringify(updated));
+  }
 
   render() {
     const total = this.expenses.reduce((s, e) => s + e.amount, 0);
@@ -126,15 +153,43 @@ export class AdminExpenses extends LitElement {
 
         <psa-modal ?open=${this.modal} modalTitle=${this.editExp ? 'Edit Expense' : 'Add Expense'} size="sm" @close=${() => this.modal = false}>
           <div class="space-y-4">
+            ${!this.editExp && this.templates.length > 0 ? html`
+              <div class="relative">
+                <button @click=${() => this.showTemplateList = !this.showTemplateList}
+                  class="w-full flex items-center justify-between px-3 py-2 text-sm bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 hover:bg-indigo-100 cursor-pointer border-solid">
+                  <span>📋 Load from Template (${this.templates.length})</span>
+                  <span>${this.showTemplateList ? '▲' : '▼'}</span>
+                </button>
+                ${this.showTemplateList ? html`
+                  <div class="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
+                    ${this.templates.map((t, idx) => html`
+                      <div class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                        <div class="flex-1 min-w-0 cursor-pointer" @click=${() => this._loadTemplate(t)}>
+                          <p class="text-sm font-medium text-gray-800 truncate">${t.description}</p>
+                          <p class="text-xs text-gray-500">${t.category} · ₹${t.amount}</p>
+                        </div>
+                        <button @click=${() => this._deleteTemplate(idx)} class="text-red-400 hover:text-red-600 bg-transparent border-none cursor-pointer text-xs px-1">✕</button>
+                      </div>
+                    `)}
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
             <psa-select label="Category" .value=${this.form.category} @value-changed=${(e: CustomEvent) => this._uf('category', e.detail)}>
               ${CATEGORIES.map(c => html`<option value=${c}>${c}</option>`)}
             </psa-select>
             <psa-input label="Description" .value=${this.form.description} @value-changed=${(e: CustomEvent) => this._uf('description', e.detail)} placeholder="e.g. Security guard salary"></psa-input>
             <psa-input label="Amount (₹)" type="number" .value=${this.form.amount} @value-changed=${(e: CustomEvent) => this._uf('amount', e.detail)}></psa-input>
             <psa-input label="Date" type="date" .value=${this.form.expenseDate} @value-changed=${(e: CustomEvent) => this._uf('expenseDate', e.detail)}></psa-input>
-            <div class="flex gap-2 justify-end pt-2">
-              <psa-button variant="secondary" @click=${() => this.modal = false}>Cancel</psa-button>
-              <psa-button .loading=${this.saving} .disabled=${!this.form.description || !this.form.amount} @click=${this._handleSave}>Save</psa-button>
+            <div class="flex items-center justify-between pt-2">
+              <button @click=${this._saveTemplate} ?disabled=${!this.form.description || !this.form.amount}
+                class="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg cursor-pointer border-none disabled:opacity-50">
+                📋 Save as Template
+              </button>
+              <div class="flex gap-2">
+                <psa-button variant="secondary" @click=${() => this.modal = false}>Cancel</psa-button>
+                <psa-button .loading=${this.saving} .disabled=${!this.form.description || !this.form.amount} @click=${this._handleSave}>Save</psa-button>
+              </div>
             </div>
           </div>
         </psa-modal>

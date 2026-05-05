@@ -38,10 +38,21 @@ export class BillsService {
   }
 
   async generateMonthlyBills(apartmentId: string, month: number, year: number, maintenanceAmount?: number) {
+    const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+
     const apartment = await this.prisma.apartment.findUnique({ where: { id: apartmentId } });
     const amount = maintenanceAmount ?? (apartment as any)?.maintenanceAmount ?? 2000;
     const flats = await this.prisma.flat.findMany({ where: { apartmentId } });
     const created: any[] = [];
+
+    // Compute previous month/year once (water is billed in the following month)
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear--;
+    }
 
     for (const flat of flats) {
       const prevBill = await this.prisma.monthlyBill.findFirst({
@@ -51,12 +62,6 @@ export class BillsService {
       const previousDue = prevBill ? (prevBill.totalAmount - prevBill.paidAmount) : 0;
 
       // Get water reading from previous month (water is billed in the following month)
-      let prevMonth = month - 1;
-      let prevYear = year;
-      if (prevMonth === 0) {
-        prevMonth = 12;
-        prevYear--;
-      }
       const waterReading = await this.prisma.waterMeterReading.findUnique({
         where: { flatId_month_year: { flatId: flat.id, month: prevMonth, year: prevYear } },
       });
@@ -100,7 +105,28 @@ export class BillsService {
         created.push({ ...bill, creditApplied: creditAmount });
       }
     }
-    
+
+    // Auto-create water expense from previous month's tanker purchases
+    const waterPurchases = await this.prisma.waterPurchase.findMany({
+      where: { apartmentId, month: prevMonth, year: prevYear },
+    });
+    if (waterPurchases.length > 0) {
+      const totalWaterCost = waterPurchases.reduce((sum, p) => sum + p.amountPaid, 0);
+      const existingWaterExpense = await this.prisma.expense.findFirst({
+        where: { apartmentId, month, year, category: 'Water', description: { contains: '[Auto-Water]' } },
+      });
+      if (!existingWaterExpense && totalWaterCost > 0) {
+        await this.prisma.expense.create({
+          data: {
+            apartmentId, month, year, category: 'Water',
+            description: `Water tanker - ${MONTH_NAMES[prevMonth]} ${prevYear} [Auto-Water]`,
+            amount: totalWaterCost,
+            expenseDate: new Date(`${year}-${String(month).padStart(2, '0')}-01`),
+          },
+        });
+      }
+    }
+
     return created;
   }
 
@@ -148,6 +174,11 @@ export class BillsService {
     // Step 3: Delete existing bills for this month/year
     await this.prisma.monthlyBill.deleteMany({
       where: { flat: { apartmentId }, month, year },
+    });
+
+    // Step 3b: Delete auto-created water expense so it gets recreated with fresh data
+    await this.prisma.expense.deleteMany({
+      where: { apartmentId, month, year, category: 'Water', description: { contains: '[Auto-Water]' } },
     });
 
     // Step 4: Regenerate — will now pick up all pending contributions
@@ -209,10 +240,9 @@ export class BillsService {
 
   async getAllTimeTotals(apartmentId: string) {
     // Authoritative total from Spend Details sheet (Jun 2020 – Mar 2026)
-    // Water is excluded: it is a pass-through cost collected from flat bills, not a net apartment expense
     const SPEND_DETAILS_TOTAL_RECEIVED = 1651504;
     const expensesResult = await this.prisma.expense.aggregate({
-      where: { apartmentId, NOT: { category: 'Water' } },
+      where: { apartmentId },
       _sum: { amount: true },
     });
     const totalExpenses = expensesResult._sum.amount ?? 0;

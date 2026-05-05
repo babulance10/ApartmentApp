@@ -759,11 +759,11 @@ export class AdminBills extends LitElement {
                 ${this.bills.filter(bill => bill.flat?.flatNumber !== 'Common').map(bill => html`
                   <tr>
                     <td style="border:1px solid #000;padding:6px">${bill.flat?.flatNumber}</td>
-                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.maintenanceAmount}</td>
-                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.waterAmount}</td>
-                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.previousDue > 0 ? bill.previousDue : (bill.previousDue < 0 ? 'CR ' + Math.abs(bill.previousDue) : 'Nil')}</td>
-                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.litersConsumed ? bill.litersConsumed * 10 : '-'}</td>
-                    <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold">${bill.totalAmount}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${Math.round(bill.maintenanceAmount)}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${Math.round(bill.waterAmount)}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.previousDue > 0 ? Math.round(bill.previousDue) : (bill.previousDue < 0 ? 'CR ' + Math.round(Math.abs(bill.previousDue)) : 'Nil')}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center">${bill.litersConsumed ? Math.round(bill.litersConsumed) : '-'}</td>
+                    <td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold">${Math.round(bill.totalAmount)}</td>
                     <td style="border:1px solid #000;padding:6px;text-align:center"></td>
                   </tr>
                 `)}
@@ -834,11 +834,11 @@ export class AdminBills extends LitElement {
                 </tr>
                 <tr style="border:1px solid #000">
                   <td style="border:1px solid #000;padding:8px">${this.printBill.flat?.flatNumber}</td>
-                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.maintenanceAmount}</td>
-                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.waterAmount}</td>
-                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.previousDue > 0 ? this.printBill.previousDue : (this.printBill.previousDue < 0 ? 'CR ' + Math.abs(this.printBill.previousDue) : 'Nil')}</td>
-                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.litersConsumed || '-'}</td>
-                  <td style="border:1px solid #000;padding:8px;text-align:center;font-weight:bold">${this.printBill.totalAmount}</td>
+                  <td style="border:1px solid #000;padding:8px;text-align:center">${Math.round(this.printBill.maintenanceAmount)}</td>
+                  <td style="border:1px solid #000;padding:8px;text-align:center">${Math.round(this.printBill.waterAmount)}</td>
+                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.previousDue > 0 ? Math.round(this.printBill.previousDue) : (this.printBill.previousDue < 0 ? 'CR ' + Math.round(Math.abs(this.printBill.previousDue)) : 'Nil')}</td>
+                  <td style="border:1px solid #000;padding:8px;text-align:center">${this.printBill.litersConsumed ? Math.round(this.printBill.litersConsumed) : '-'}</td>
+                  <td style="border:1px solid #000;padding:8px;text-align:center;font-weight:bold">${Math.round(this.printBill.totalAmount)}</td>
                   <td style="border:1px solid #000;padding:8px;text-align:center"></td>
                 </tr>
               </table>

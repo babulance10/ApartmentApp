@@ -1,18 +1,21 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { iconReceipt, iconTrendingUp, iconTrendingDown, iconAlertCircle, iconCheckCircle, iconWallet, iconPiggyBank } from '../../lib/icons.js';
-import { formatCurrency, monthName, currentMonthYear } from '../../lib/utils.js';
+import { formatCurrency, monthName, currentMonthYear, MONTHS } from '../../lib/utils.js';
 import api from '../../lib/api.js';
 
 const APARTMENT_ID = 'psa-main';
 
 @customElement('admin-dashboard')
 export class AdminDashboard extends LitElement {
+  @state() private month = currentMonthYear().month;
+  @state() private year = currentMonthYear().year;
   @state() private summary: any = null;
   @state() private expenses: any[] = [];
   @state() private maintenance: any[] = [];
   @state() private allTimeTotals: any = null;
   @state() private loading = true;
+  private _years = [2024, 2025, 2026, 2027];
 
   createRenderRoot() { return this; }
 
@@ -21,12 +24,16 @@ export class AdminDashboard extends LitElement {
     this._load();
   }
 
+  updated(changed: Map<string, any>) {
+    if ((changed.has('month') && changed.get('month') !== undefined) || (changed.has('year') && changed.get('year') !== undefined)) this._load();
+  }
+
   private async _load() {
-    const { month, year } = currentMonthYear();
+    this.loading = true;
     try {
       const [s, e, m, allTime] = await Promise.all([
-        api.get(`/bills/summary?apartmentId=${APARTMENT_ID}&month=${month}&year=${year}`),
-        api.get(`/expenses?apartmentId=${APARTMENT_ID}&month=${month}&year=${year}`),
+        api.get(`/bills/summary?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`),
+        api.get(`/expenses?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`),
         api.get(`/maintenance?status=OPEN`),
         api.get(`/bills/all-time-totals?apartmentId=${APARTMENT_ID}`),
       ]);
@@ -39,7 +46,6 @@ export class AdminDashboard extends LitElement {
   }
 
   render() {
-    const { month, year } = currentMonthYear();
     const totalExpenses = this.expenses.reduce((s: number, e: any) => s + e.amount, 0);
     const collected = this.summary?.totalCollected ?? 0;
     const due = this.summary?.totalDue ?? 0;
@@ -51,7 +57,7 @@ export class AdminDashboard extends LitElement {
     const remaining = totalReceived - totalExpensesAllTime;
 
     const stats = [
-      { label: 'Total Due', value: formatCurrency(due), icon: iconReceipt, color: 'bg-blue-500', sub: `${monthName(month)} ${year}` },
+      { label: 'Total Due', value: formatCurrency(due), icon: iconReceipt, color: 'bg-blue-500', sub: `${monthName(this.month)} ${this.year}` },
       { label: 'Collected', value: formatCurrency(collected), icon: iconTrendingUp, color: 'bg-green-500', sub: `${paidFlats}/${totalFlats} flats paid` },
       { label: 'Pending', value: formatCurrency(pending), icon: iconTrendingDown, color: 'bg-red-500', sub: `${totalFlats - paidFlats} flats pending` },
       { label: 'Expenses', value: formatCurrency(totalExpenses), icon: iconTrendingDown, color: 'bg-orange-500', sub: `${this.expenses.length} entries` },
@@ -60,8 +66,20 @@ export class AdminDashboard extends LitElement {
     return html`
       <div>
         <div class="mb-6">
-          <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p class="text-gray-500 text-sm mt-1">${monthName(month)} ${year} Overview</p>
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+              <p class="text-gray-500 text-sm mt-1">${monthName(this.month)} ${this.year} Overview</p>
+            </div>
+            <div class="flex gap-2">
+              <psa-select .value=${String(this.month)} @value-changed=${(e: CustomEvent) => this.month = +e.detail}>
+                ${MONTHS.map((m, i) => html`<option value=${i + 1}>${m}</option>`)}
+              </psa-select>
+              <psa-select .value=${String(this.year)} @value-changed=${(e: CustomEvent) => this.year = +e.detail}>
+                ${this._years.map(y => html`<option value=${y}>${y}</option>`)}
+              </psa-select>
+            </div>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -107,7 +125,7 @@ export class AdminDashboard extends LitElement {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div class="px-6 py-4 border-b border-gray-100">
-              <h2 class="font-semibold text-gray-900">Payment Status — ${monthName(month)} ${year}</h2>
+              <h2 class="font-semibold text-gray-900">Payment Status — ${monthName(this.month)} ${this.year}</h2>
             </div>
             <div>
               ${this.loading ? html`<p class="px-6 py-4 text-gray-500 text-sm">Loading...</p>` :
