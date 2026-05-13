@@ -12,7 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "render-build": "node_modules/.bin/prisma generate && npx ts-node prisma/pre-migrate.ts && node_modules/.bin/prisma db push --accept-data-loss && nest build",
+    "render-build": "pnpm install --frozen-lockfile && node_modules/.bin/prisma generate && npx ts-node prisma/pre-migrate.ts && node_modules/.bin/prisma db push --accept-data-loss && nest build",
     "render-start": "node dist/main",
     "postinstall": "node_modules/.bin/prisma generate",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
