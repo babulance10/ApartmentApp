@@ -16,5 +16,6 @@
     "tailwindcss": "^4",
     "@tailwindcss/vite": "^4"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "packageManager": "pnpm@9.9.0"
 }
