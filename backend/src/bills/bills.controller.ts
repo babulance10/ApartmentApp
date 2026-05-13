@@ -101,7 +101,7 @@ export class BillsController {
   }
 
   @Patch(':id')
-  updateBill(@Param('id') id: string, @Body() dto: { maintenanceAmount?: number; waterAmount?: number; previousDue?: number }) {
+  updateBill(@Param('id') id: string, @Body() dto: { maintenanceAmount?: number; waterAmount?: number; previousDue?: number; paidAmount?: number }) {
     return this.billsService.updateBill(id, dto);
   }
 

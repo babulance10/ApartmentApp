@@ -195,14 +195,15 @@ export class BillsService {
     });
   }
 
-  async updateBill(id: string, dto: { maintenanceAmount?: number; waterAmount?: number; previousDue?: number }) {
+  async updateBill(id: string, dto: { maintenanceAmount?: number; waterAmount?: number; previousDue?: number; paidAmount?: number }) {
     const bill = await this.prisma.monthlyBill.findUnique({ where: { id }, include: { payments: true } });
     if (!bill) throw new NotFoundException('Bill not found');
     const maintenanceAmount = dto.maintenanceAmount ?? bill.maintenanceAmount;
     const waterAmount = dto.waterAmount ?? bill.waterAmount;
     const previousDue = dto.previousDue ?? bill.previousDue;
     const totalAmount = maintenanceAmount + waterAmount + previousDue;
-    const paidAmount = bill.payments.reduce((sum, p) => sum + p.amount, 0);
+    // Allow direct paidAmount update (admin correction) or calculate from payments
+    const paidAmount = dto.paidAmount !== undefined ? dto.paidAmount : bill.payments.reduce((sum, p) => sum + p.amount, 0);
     let status: BillStatus = BillStatus.PENDING;
     if (paidAmount >= totalAmount) status = BillStatus.PAID;
     else if (paidAmount > 0) status = BillStatus.PARTIAL;

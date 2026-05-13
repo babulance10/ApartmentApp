@@ -113,11 +113,20 @@ export class TenantBills extends LitElement {
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
                   <div class="px-6 py-4 border-b border-gray-100"><h2 class="font-semibold text-gray-900">Pay via UPI</h2></div>
                   <div class="px-6 py-4 space-y-3">
-                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center space-y-2">
-                      ${iconBuilding2('w-8 h-8 text-blue-600 mx-auto')}
-                      <p class="text-2xl font-bold text-blue-700">${this.apartment.upiNumber}</p>
-                      <p class="text-sm text-gray-600">${this.apartment.upiName}</p>
-                      <p class="text-xs text-gray-400 mt-2">Remarks: Flat ${this.flatInfo?.flatNumber} / ${monthName(this.month)} ${this.year}</p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                      <div class="flex items-start gap-2">
+                        <span class="text-blue-600 text-lg">ℹ️</span>
+                        <div class="flex-1">
+                          <p class="text-sm font-semibold text-blue-800">Manual Payment Process</p>
+                          <p class="text-xs text-blue-700 mt-1">Payment gateway is not integrated. Please scan the QR code or use the UPI ID below to make payment manually. After payment, the admin will verify and update your bill status.</p>
+                        </div>
+                      </div>
+                      <div class="border-t border-blue-200 pt-3 text-center space-y-2">
+                        ${iconBuilding2('w-8 h-8 text-blue-600 mx-auto')}
+                        <p class="text-2xl font-bold text-blue-700">${this.apartment.upiNumber}</p>
+                        <p class="text-sm text-gray-600">${this.apartment.upiName}</p>
+                        <p class="text-xs text-gray-400 mt-2">Remarks: Flat ${this.flatInfo?.flatNumber} / ${monthName(this.month)} ${this.year}</p>
+                      </div>
                     </div>
                     <a href=${`upi://pay?pa=${encodeURIComponent(this.apartment.upiNumber || '')}&pn=${encodeURIComponent(this.apartment.upiName || '')}&am=${bill.totalAmount - bill.paidAmount}&tn=${encodeURIComponent(`Flat ${this.flatInfo?.flatNumber} ${monthName(this.month)} ${this.year}`)}&cu=INR`}
                       class="flex items-center justify-center gap-2 w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm cursor-pointer no-underline">

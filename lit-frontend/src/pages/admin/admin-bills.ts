@@ -30,6 +30,8 @@ export class AdminBills extends LitElement {
   @state() private printBill: any = null;
   @state() private regenerating = false;
   @state() private printingAll = false;
+  @state() private editPaymentModal: any = null;
+  @state() private editPaymentAmount = '';
 
   createRenderRoot() { return this; }
   connectedCallback() { super.connectedCallback(); this._load(); }
@@ -255,6 +257,40 @@ export class AdminBills extends LitElement {
     this.saving = false;
   }
 
+  private async _handleEditPayment() {
+    if (!this.editPaymentModal) return;
+    const newPaidAmount = parseFloat(this.editPaymentAmount);
+    if (isNaN(newPaidAmount) || newPaidAmount < 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    this.saving = true;
+    try {
+      await api.patch(`/bills/${this.editPaymentModal.id}`, { paidAmount: newPaidAmount });
+      await this._load();
+      this.editPaymentModal = null;
+      this.editPaymentAmount = '';
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Error updating payment');
+    }
+    this.saving = false;
+  }
+
+  private async _markAsUnpaid() {
+    if (!this.editPaymentModal) return;
+    if (!confirm('Mark this bill as unpaid (set paid amount to ₹0)?')) return;
+    this.saving = true;
+    try {
+      await api.patch(`/bills/${this.editPaymentModal.id}`, { paidAmount: 0 });
+      await this._load();
+      this.editPaymentModal = null;
+      this.editPaymentAmount = '';
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Error marking as unpaid');
+    }
+    this.saving = false;
+  }
+
   private async _handleEditBill() {
     if (!this.editModal) return;
     this.saving = true;
@@ -471,7 +507,11 @@ export class AdminBills extends LitElement {
                               Pay
                             </button>` : ''}
                           <button @click=${() => { this.editForm = { maintenanceAmount: String(bill.maintenanceAmount), waterAmount: String(bill.waterAmount), previousDue: String(bill.previousDue) }; this.editModal = { open: true, bill }; }}
-                            title="Edit" class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer bg-transparent border-none transition-all">${iconEdit2('w-3 h-3')}</button>
+                            title="Edit Bill" class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer bg-transparent border-none transition-all">${iconEdit2('w-3 h-3')}</button>
+                          ${bill.paidAmount > 0 ? html`
+                            <button @click=${() => { this.editPaymentAmount = String(bill.paidAmount); this.editPaymentModal = bill; }}
+                              title="Edit Payment" class="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded cursor-pointer bg-transparent border-none transition-all">💰</button>
+                          ` : ''}
                           <button @click=${() => this._sendWhatsApp(bill)}
                             title="WhatsApp" class="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded cursor-pointer bg-transparent border-none transition-all">${iconMessageCircle('w-3 h-3')}</button>
                           <button @click=${() => this._sendEmail(bill)}
@@ -650,6 +690,38 @@ export class AdminBills extends LitElement {
                 Send All (${this._announcementTargets.length} tenants)
               </button>
               <psa-button variant="secondary" @click=${() => this.announcementModal = false}>Close</psa-button>
+            </div>
+          </div>
+        </psa-modal>
+
+        <!-- ── Edit Payment Modal ── -->
+        <psa-modal ?open=${!!this.editPaymentModal} modalTitle="Edit Paid Amount — Flat ${this.editPaymentModal?.flat?.flatNumber || ''}" size="sm" @close=${() => this.editPaymentModal = null}>
+          <div class="space-y-4">
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm space-y-2">
+              <div class="flex items-start gap-2">
+                <span class="text-amber-600 text-lg">⚠️</span>
+                <div>
+                  <p class="font-semibold text-amber-800">Admin Only</p>
+                  <p class="text-amber-700 text-xs mt-1">This will directly update the paid amount. Use this to correct mistakes in payment recording.</p>
+                </div>
+              </div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4 text-sm space-y-2 border border-gray-200">
+              <div class="flex justify-between"><span class="text-gray-500">Total Bill Amount</span><span class="font-semibold text-gray-800">${formatCurrency(this.editPaymentModal?.totalAmount ?? 0)}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">Current Paid Amount</span><span class="font-semibold text-green-600">${formatCurrency(this.editPaymentModal?.paidAmount ?? 0)}</span></div>
+              <div class="h-px bg-gray-200 my-1"></div>
+              <div class="flex justify-between"><span class="text-gray-600 font-medium">Current Balance</span><span class="font-bold text-lg ${(this.editPaymentModal?.totalAmount ?? 0) - (this.editPaymentModal?.paidAmount ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}">${formatCurrency((this.editPaymentModal?.totalAmount ?? 0) - (this.editPaymentModal?.paidAmount ?? 0))}</span></div>
+            </div>
+            <psa-input label="New Paid Amount (₹)" type="number" .value=${this.editPaymentAmount} @value-changed=${(e: CustomEvent) => this.editPaymentAmount = e.detail} placeholder="Enter corrected amount"></psa-input>
+            <div class="flex gap-2 justify-between pt-2">
+              <button @click=${this._markAsUnpaid} ?disabled=${this.saving}
+                class="px-3 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg cursor-pointer border border-red-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                Mark as Unpaid
+              </button>
+              <div class="flex gap-2">
+                <psa-button variant="secondary" @click=${() => this.editPaymentModal = null}>Cancel</psa-button>
+                <psa-button .loading=${this.saving} .disabled=${!this.editPaymentAmount} @click=${this._handleEditPayment}>Update Paid Amount</psa-button>
+              </div>
             </div>
           </div>
         </psa-modal>
