@@ -240,51 +240,72 @@ export class BillsService {
   }
 
   async getAllTimeTotals(apartmentId: string) {
-    // Authoritative total from Spend Details sheet, covering collections up to
-    // and including March 2026 (Jun 2020 – Mar 2026). This figure is frozen by
-    // design, so anything collected after that cutoff must be added on top -
-    // otherwise "Total Received" (and the Remaining Balance derived from it)
-    // would never grow past March 2026 no matter how much gets collected later.
-    const SPEND_DETAILS_TOTAL_RECEIVED = 1651504;
-    const CUTOFF_MONTH = 3;
-    const CUTOFF_YEAR = 2026;
+    // Collections are derived from the app's own payment records rather than a
+    // frozen spreadsheet constant, so the figure stays correct as money comes
+    // in. Bill records only start in 2021, so collections for Jun-Dec 2020 are
+    // carried as an opening balance taken from the historical Spend Details
+    // sheet. That period is pure maintenance - per-flat water billing only
+    // began in 2024 - so none of it is attributed to water below.
+    const PRE_2021_OPENING_RECEIVED = 155659;
 
     const flats = await this.prisma.flat.findMany({ where: { apartmentId }, select: { id: true } });
     const flatIds = flats.map(f => f.id);
 
-    // Water tanker purchases (WaterPurchase) are the authoritative source for
-    // that spend. Each month's bill generation *also* auto-creates a mirror
-    // Expense row tagged "[Auto-Water]" for display on the Expenses page, but
-    // that side-effect has occasionally failed to fire (e.g. it silently
-    // missed Mar/Apr 2026), which would under-count real spending if we only
-    // looked at Expense. So we sum Expense and WaterPurchase separately and
-    // exclude the "[Auto-Water]" mirror rows from the Expense side, to avoid
-    // ever double-counting the same purchase while never silently missing one.
-    const [expensesResult, waterPurchasesResult, collectedAfterCutoff] = await Promise.all([
+    // Water spend lives in two places: tanker loads in WaterPurchase (the
+    // authoritative ledger) and manually entered water bills under the "Water"
+    // expense category. Bill generation also mirrors each month's tanker total
+    // into a "[Auto-Water]" Expense row for display, so those mirror rows are
+    // excluded here to avoid counting the same tanker money twice.
+    const [bills, otherExpensesResult, waterExpensesResult, waterPurchasesResult] = await Promise.all([
+      this.prisma.monthlyBill.findMany({
+        where: { flatId: { in: flatIds } },
+        select: { waterAmount: true, totalAmount: true, paidAmount: true },
+      }),
       this.prisma.expense.aggregate({
-        where: { apartmentId, NOT: { description: { contains: '[Auto-Water]' } } },
+        where: { apartmentId, category: { not: 'Water' } },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { apartmentId, category: 'Water', NOT: { description: { contains: '[Auto-Water]' } } },
         _sum: { amount: true },
       }),
       this.prisma.waterPurchase.aggregate({
         where: { apartmentId },
         _sum: { amountPaid: true },
       }),
-      this.prisma.monthlyBill.aggregate({
-        where: {
-          flatId: { in: flatIds },
-          OR: [
-            { year: { gt: CUTOFF_YEAR } },
-            { year: CUTOFF_YEAR, month: { gt: CUTOFF_MONTH } },
-          ],
-        },
-        _sum: { paidAmount: true },
-      }),
     ]);
 
-    const totalExpenses = (expensesResult._sum.amount ?? 0) + (waterPurchasesResult._sum.amountPaid ?? 0);
-    const totalReceived = SPEND_DETAILS_TOTAL_RECEIVED + (collectedAfterCutoff._sum.paidAmount ?? 0);
-    const remaining = totalReceived - totalExpenses;
-    return { totalReceived, totalExpenses, remaining };
+    // Each payment settles a bill as a whole, so split it across that bill's
+    // water and non-water components in proportion to how it was billed. Water
+    // money is effectively a pass-through used to pay tankers and water bills,
+    // so it is reported separately from maintenance income.
+    let collectedFromBills = 0;
+    let waterReceived = 0;
+    for (const b of bills) {
+      collectedFromBills += b.paidAmount;
+      if (b.totalAmount > 0 && b.waterAmount > 0) {
+        waterReceived += b.paidAmount * (b.waterAmount / b.totalAmount);
+      }
+    }
+
+    const totalReceived = PRE_2021_OPENING_RECEIVED + collectedFromBills;
+    const maintenanceReceived = totalReceived - waterReceived;
+
+    const waterExpenses = (waterExpensesResult._sum.amount ?? 0) + (waterPurchasesResult._sum.amountPaid ?? 0);
+    const otherExpenses = otherExpensesResult._sum.amount ?? 0;
+    const totalExpenses = waterExpenses + otherExpenses;
+
+    return {
+      totalReceived,
+      maintenanceReceived,
+      waterReceived,
+      openingBalance: PRE_2021_OPENING_RECEIVED,
+      totalExpenses,
+      waterExpenses,
+      otherExpenses,
+      remaining: totalReceived - totalExpenses,
+      waterNet: waterReceived - waterExpenses,
+    };
   }
 
   async bulkSendEmails(apartmentId: string, month: number, year: number): Promise<{ sent: string[]; skipped: string[]; failed: string[] }> {
