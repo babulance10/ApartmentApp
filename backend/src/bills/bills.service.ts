@@ -252,10 +252,22 @@ export class BillsService {
     const flats = await this.prisma.flat.findMany({ where: { apartmentId }, select: { id: true } });
     const flatIds = flats.map(f => f.id);
 
-    const [expensesResult, collectedAfterCutoff] = await Promise.all([
+    // Water tanker purchases (WaterPurchase) are the authoritative source for
+    // that spend. Each month's bill generation *also* auto-creates a mirror
+    // Expense row tagged "[Auto-Water]" for display on the Expenses page, but
+    // that side-effect has occasionally failed to fire (e.g. it silently
+    // missed Mar/Apr 2026), which would under-count real spending if we only
+    // looked at Expense. So we sum Expense and WaterPurchase separately and
+    // exclude the "[Auto-Water]" mirror rows from the Expense side, to avoid
+    // ever double-counting the same purchase while never silently missing one.
+    const [expensesResult, waterPurchasesResult, collectedAfterCutoff] = await Promise.all([
       this.prisma.expense.aggregate({
-        where: { apartmentId },
+        where: { apartmentId, NOT: { description: { contains: '[Auto-Water]' } } },
         _sum: { amount: true },
+      }),
+      this.prisma.waterPurchase.aggregate({
+        where: { apartmentId },
+        _sum: { amountPaid: true },
       }),
       this.prisma.monthlyBill.aggregate({
         where: {
@@ -269,7 +281,7 @@ export class BillsService {
       }),
     ]);
 
-    const totalExpenses = expensesResult._sum.amount ?? 0;
+    const totalExpenses = (expensesResult._sum.amount ?? 0) + (waterPurchasesResult._sum.amountPaid ?? 0);
     const totalReceived = SPEND_DETAILS_TOTAL_RECEIVED + (collectedAfterCutoff._sum.paidAmount ?? 0);
     const remaining = totalReceived - totalExpenses;
     return { totalReceived, totalExpenses, remaining };
