@@ -28,7 +28,16 @@ export class ExpensesService {
   }
 
   update(id: string, dto: any) {
-    return this.prisma.expense.update({ where: { id }, data: dto });
+    const data = { ...dto };
+    if (data.expenseDate) {
+      const parsedDate = new Date(data.expenseDate);
+      data.expenseDate = parsedDate;
+      // Keep month/year in sync with the (possibly changed) expense date
+      // so the record still shows up under the correct monthly filter.
+      data.month = parsedDate.getMonth() + 1;
+      data.year = parsedDate.getFullYear();
+    }
+    return this.prisma.expense.update({ where: { id }, data });
   }
 
   delete(id: string) {

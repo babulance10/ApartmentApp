@@ -61,6 +61,7 @@ model Apartment {
 
   flats           Flat[]
   expenses        Expense[]
+  expenseTemplates ExpenseTemplate[]
   waterPurchases  WaterPurchase[]
   events          Event[]
 }
@@ -164,6 +165,17 @@ model Expense {
   description String
   amount      Float
   expenseDate DateTime
+  createdAt   DateTime @default(now())
+
+  apartment   Apartment @relation(fields: [apartmentId], references: [id])
+}
+
+model ExpenseTemplate {
+  id          String   @id @default(cuid())
+  apartmentId String
+  category    String
+  description String
+  amount      Float
   createdAt   DateTime @default(now())
 
   apartment   Apartment @relation(fields: [apartmentId], references: [id])

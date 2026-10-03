@@ -17,15 +17,16 @@ export class AdminExpenses extends LitElement {
   @state() private editExp: any = null;
   @state() private form = { category: 'Security', description: '', amount: '', expenseDate: '' };
   @state() private saving = false;
-  @state() private templates: {category: string; description: string; amount: string}[] = [];
+  @state() private templates: { id: string; category: string; description: string; amount: number }[] = [];
   @state() private showTemplateList = false;
+  @state() private applyModal = false;
+  @state() private applyingId: string | null = null;
 
   createRenderRoot() { return this; }
   connectedCallback() {
     super.connectedCallback();
     this._load();
-    const saved = localStorage.getItem('expense-templates');
-    this.templates = saved ? JSON.parse(saved) : [];
+    this._loadTemplates();
   }
 
   private async _load() {
@@ -35,6 +36,11 @@ export class AdminExpenses extends LitElement {
     this.loading = false;
   }
 
+  private async _loadTemplates() {
+    try { const { data } = await api.get(`/expense-templates?apartmentId=${APARTMENT_ID}`); this.templates = data; }
+    catch { this.templates = []; }
+  }
+
   updated(changed: Map<string, any>) {
     if ((changed.has('month') && changed.get('month') !== undefined) || (changed.has('year') && changed.get('year') !== undefined)) this._load();
   }
@@ -42,12 +48,14 @@ export class AdminExpenses extends LitElement {
   private _openCreate() {
     this.editExp = null;
     this.form = { category: 'Security', description: '', amount: '', expenseDate: new Date().toISOString().split('T')[0] };
+    this.showTemplateList = false;
     this.modal = true;
   }
 
   private _openEdit(e: any) {
     this.editExp = e;
     this.form = { category: e.category, description: e.description, amount: String(e.amount), expenseDate: e.expenseDate?.split('T')[0] ?? '' };
+    this.showTemplateList = false;
     this.modal = true;
   }
 
@@ -72,24 +80,38 @@ export class AdminExpenses extends LitElement {
   private _uf(key: string, val: string) { this.form = { ...this.form, [key]: val }; }
   private _years = [2024, 2025, 2026, 2027];
 
-  private _saveTemplate() {
+  private async _saveTemplate() {
     if (!this.form.description || !this.form.amount) return;
-    const t = { category: this.form.category, description: this.form.description, amount: this.form.amount };
-    const updated = [...this.templates, t];
-    this.templates = updated;
-    localStorage.setItem('expense-templates', JSON.stringify(updated));
-    alert(`Template "${t.description}" saved!`);
+    try {
+      await api.post('/expense-templates', { apartmentId: APARTMENT_ID, category: this.form.category, description: this.form.description, amount: parseFloat(this.form.amount) });
+      await this._loadTemplates();
+      alert(`Template "${this.form.description}" saved!`);
+    } catch (e: any) { alert(e.response?.data?.message || 'Could not save template'); }
   }
 
-  private _loadTemplate(t: {category: string; description: string; amount: string}) {
-    this.form = { ...this.form, category: t.category, description: t.description, amount: t.amount };
+  private _loadTemplate(t: { category: string; description: string; amount: number }) {
+    this.form = { ...this.form, category: t.category, description: t.description, amount: String(t.amount) };
     this.showTemplateList = false;
   }
 
-  private _deleteTemplate(idx: number) {
-    const updated = this.templates.filter((_, i) => i !== idx);
-    this.templates = updated;
-    localStorage.setItem('expense-templates', JSON.stringify(updated));
+  private async _deleteTemplate(id: string) {
+    if (!confirm('Delete this template?')) return;
+    await api.delete(`/expense-templates/${id}`);
+    await this._loadTemplates();
+  }
+
+  /** Applies a saved template as a brand-new expense for the month/year currently selected on the page. */
+  private async _applyTemplate(t: { id: string; category: string; description: string; amount: number }) {
+    this.applyingId = t.id;
+    const isCurrentPeriod = this.month === currentMonthYear().month && this.year === currentMonthYear().year;
+    const expenseDate = isCurrentPeriod
+      ? new Date().toISOString().split('T')[0]
+      : new Date(this.year, this.month - 1, 1).toISOString().split('T')[0];
+    try {
+      await api.post('/expenses', { apartmentId: APARTMENT_ID, month: this.month, year: this.year, category: t.category, description: t.description, amount: t.amount, expenseDate });
+      await this._load();
+    } catch (e: any) { alert(e.response?.data?.message || 'Could not apply template'); }
+    this.applyingId = null;
   }
 
   render() {
@@ -103,7 +125,12 @@ export class AdminExpenses extends LitElement {
             <h1 class="text-2xl font-bold text-gray-900">Expenses</h1>
             <p class="text-gray-500 text-sm mt-1">${monthName(this.month)} ${this.year} — Total: ${formatCurrency(total)}</p>
           </div>
-          <psa-button @click=${this._openCreate}>${iconPlus('w-4 h-4')} Add Expense</psa-button>
+          <div class="flex gap-2">
+            ${this.templates.length > 0 ? html`
+              <psa-button variant="secondary" @click=${() => this.applyModal = true}>📋 Apply Template</psa-button>
+            ` : ''}
+            <psa-button @click=${this._openCreate}>${iconPlus('w-4 h-4')} Add Expense</psa-button>
+          </div>
         </div>
         <div class="flex gap-3 mb-6">
           <psa-select .value=${String(this.month)} @value-changed=${(e: CustomEvent) => this.month = +e.detail}>
@@ -151,9 +178,25 @@ export class AdminExpenses extends LitElement {
           </div>
         </div>
 
+        <psa-modal ?open=${this.applyModal} modalTitle="Apply Template" size="sm" @close=${() => this.applyModal = false}>
+          <div class="space-y-2">
+            <p class="text-sm text-gray-500 mb-2">Add a recurring expense straight to ${monthName(this.month)} ${this.year} from a saved template.</p>
+            ${this.templates.length === 0 ? html`<p class="text-sm text-gray-400">No templates saved yet.</p>` : this.templates.map(t => html`
+              <div class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800 truncate">${t.description}</p>
+                  <p class="text-xs text-gray-500">${t.category} · ₹${t.amount}</p>
+                </div>
+                <psa-button .loading=${this.applyingId === t.id} .disabled=${this.applyingId !== null} @click=${() => this._applyTemplate(t)}>Apply</psa-button>
+                <button @click=${() => this._deleteTemplate(t.id)} class="text-red-400 hover:text-red-600 bg-transparent border-none cursor-pointer text-sm px-1">✕</button>
+              </div>
+            `)}
+          </div>
+        </psa-modal>
+
         <psa-modal ?open=${this.modal} modalTitle=${this.editExp ? 'Edit Expense' : 'Add Expense'} size="sm" @close=${() => this.modal = false}>
           <div class="space-y-4">
-            ${!this.editExp && this.templates.length > 0 ? html`
+            ${this.templates.length > 0 ? html`
               <div class="relative">
                 <button @click=${() => this.showTemplateList = !this.showTemplateList}
                   class="w-full flex items-center justify-between px-3 py-2 text-sm bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 hover:bg-indigo-100 cursor-pointer border-solid">
@@ -162,13 +205,13 @@ export class AdminExpenses extends LitElement {
                 </button>
                 ${this.showTemplateList ? html`
                   <div class="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
-                    ${this.templates.map((t, idx) => html`
+                    ${this.templates.map((t) => html`
                       <div class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0">
                         <div class="flex-1 min-w-0 cursor-pointer" @click=${() => this._loadTemplate(t)}>
                           <p class="text-sm font-medium text-gray-800 truncate">${t.description}</p>
                           <p class="text-xs text-gray-500">${t.category} · ₹${t.amount}</p>
                         </div>
-                        <button @click=${() => this._deleteTemplate(idx)} class="text-red-400 hover:text-red-600 bg-transparent border-none cursor-pointer text-xs px-1">✕</button>
+                        <button @click=${() => this._deleteTemplate(t.id)} class="text-red-400 hover:text-red-600 bg-transparent border-none cursor-pointer text-xs px-1">✕</button>
                       </div>
                     `)}
                   </div>
