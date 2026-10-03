@@ -62,6 +62,7 @@ model Apartment {
   flats           Flat[]
   expenses        Expense[]
   expenseTemplates ExpenseTemplate[]
+  expenseTemplateSets ExpenseTemplateSet[]
   waterPurchases  WaterPurchase[]
   events          Event[]
 }
@@ -170,15 +171,29 @@ model Expense {
   apartment   Apartment @relation(fields: [apartmentId], references: [id])
 }
 
+model ExpenseTemplateSet {
+  id          String   @id @default(cuid())
+  apartmentId String
+  name        String
+  createdAt   DateTime @default(now())
+
+  apartment   Apartment         @relation(fields: [apartmentId], references: [id])
+  items       ExpenseTemplate[]
+}
+
 model ExpenseTemplate {
   id          String   @id @default(cuid())
   apartmentId String
+  // When null the template is a standalone single-expense shortcut; when set
+  // it is one line of a reusable multi-expense set (e.g. a whole month).
+  setId       String?
   category    String
   description String
   amount      Float
   createdAt   DateTime @default(now())
 
-  apartment   Apartment @relation(fields: [apartmentId], references: [id])
+  apartment   Apartment           @relation(fields: [apartmentId], references: [id])
+  set         ExpenseTemplateSet? @relation(fields: [setId], references: [id], onDelete: Cascade)
 }
 
 model MaintenanceRequest {
