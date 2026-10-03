@@ -55,10 +55,6 @@ export class AdminDashboard extends LitElement {
     const totalReceived = this.allTimeTotals?.totalReceived ?? 0;
     const totalExpensesAllTime = this.allTimeTotals?.totalExpenses ?? 0;
     const remaining = totalReceived - totalExpensesAllTime;
-    const maintenanceReceived = this.allTimeTotals?.maintenanceReceived ?? 0;
-    const waterReceived = this.allTimeTotals?.waterReceived ?? 0;
-    const waterExpenses = this.allTimeTotals?.waterExpenses ?? 0;
-    const otherExpenses = this.allTimeTotals?.otherExpenses ?? 0;
 
     const stats = [
       { label: 'Total Due', value: formatCurrency(due), icon: iconReceipt, color: 'bg-blue-500', sub: `${monthName(this.month)} ${this.year}` },
@@ -94,9 +90,7 @@ export class AdminDashboard extends LitElement {
             <div>
               <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Total Received (All Time)</p>
               <p class="text-2xl font-bold text-indigo-700">${this.loading ? '...' : formatCurrency(totalReceived)}</p>
-              <p class="text-xs text-indigo-400">
-                ${this.loading ? 'Since inception' : html`Maintenance ${formatCurrency(maintenanceReceived)} · Water ${formatCurrency(waterReceived)}`}
-              </p>
+              <p class="text-xs text-indigo-400">Since inception</p>
             </div>
           </div>
           <div class="flex items-center gap-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 rounded-xl px-5 py-4">
@@ -106,9 +100,7 @@ export class AdminDashboard extends LitElement {
             <div>
               <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wide">Remaining Balance</p>
               <p class="text-2xl font-bold text-emerald-700">${this.loading ? '...' : formatCurrency(remaining)}</p>
-              <p class="text-xs text-emerald-400">
-                ${this.loading ? 'After all expenses' : html`Spent ${formatCurrency(totalExpensesAllTime)} — Water ${formatCurrency(waterExpenses)} · Other ${formatCurrency(otherExpenses)}`}
-              </p>
+              <p class="text-xs text-emerald-400">After all expenses</p>
             </div>
           </div>
         </div>
