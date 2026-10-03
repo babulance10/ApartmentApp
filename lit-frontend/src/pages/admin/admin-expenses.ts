@@ -126,9 +126,7 @@ export class AdminExpenses extends LitElement {
             <p class="text-gray-500 text-sm mt-1">${monthName(this.month)} ${this.year} — Total: ${formatCurrency(total)}</p>
           </div>
           <div class="flex gap-2">
-            ${this.templates.length > 0 ? html`
-              <psa-button variant="secondary" @click=${() => this.applyModal = true}>📋 Apply Template</psa-button>
-            ` : ''}
+            <psa-button variant="secondary" @click=${() => this.applyModal = true}>📋 Apply Template</psa-button>
             <psa-button @click=${this._openCreate}>${iconPlus('w-4 h-4')} Add Expense</psa-button>
           </div>
         </div>
@@ -181,7 +179,7 @@ export class AdminExpenses extends LitElement {
         <psa-modal ?open=${this.applyModal} modalTitle="Apply Template" size="sm" @close=${() => this.applyModal = false}>
           <div class="space-y-2">
             <p class="text-sm text-gray-500 mb-2">Add a recurring expense straight to ${monthName(this.month)} ${this.year} from a saved template.</p>
-            ${this.templates.length === 0 ? html`<p class="text-sm text-gray-400">No templates saved yet.</p>` : this.templates.map(t => html`
+            ${this.templates.length === 0 ? html`<p class="text-sm text-gray-400">No templates saved yet. Open "Add Expense", fill in the details, then click "Save as Template" to create one.</p>` : this.templates.map(t => html`
               <div class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg">
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-gray-800 truncate">${t.description}</p>

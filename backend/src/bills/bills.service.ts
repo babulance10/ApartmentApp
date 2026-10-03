@@ -240,15 +240,39 @@ export class BillsService {
   }
 
   async getAllTimeTotals(apartmentId: string) {
-    // Authoritative total from Spend Details sheet (Jun 2020 – Mar 2026)
+    // Authoritative total from Spend Details sheet, covering collections up to
+    // and including March 2026 (Jun 2020 – Mar 2026). This figure is frozen by
+    // design, so anything collected after that cutoff must be added on top -
+    // otherwise "Total Received" (and the Remaining Balance derived from it)
+    // would never grow past March 2026 no matter how much gets collected later.
     const SPEND_DETAILS_TOTAL_RECEIVED = 1651504;
-    const expensesResult = await this.prisma.expense.aggregate({
-      where: { apartmentId },
-      _sum: { amount: true },
-    });
+    const CUTOFF_MONTH = 3;
+    const CUTOFF_YEAR = 2026;
+
+    const flats = await this.prisma.flat.findMany({ where: { apartmentId }, select: { id: true } });
+    const flatIds = flats.map(f => f.id);
+
+    const [expensesResult, collectedAfterCutoff] = await Promise.all([
+      this.prisma.expense.aggregate({
+        where: { apartmentId },
+        _sum: { amount: true },
+      }),
+      this.prisma.monthlyBill.aggregate({
+        where: {
+          flatId: { in: flatIds },
+          OR: [
+            { year: { gt: CUTOFF_YEAR } },
+            { year: CUTOFF_YEAR, month: { gt: CUTOFF_MONTH } },
+          ],
+        },
+        _sum: { paidAmount: true },
+      }),
+    ]);
+
     const totalExpenses = expensesResult._sum.amount ?? 0;
-    const remaining = SPEND_DETAILS_TOTAL_RECEIVED - totalExpenses;
-    return { totalReceived: SPEND_DETAILS_TOTAL_RECEIVED, totalExpenses, remaining };
+    const totalReceived = SPEND_DETAILS_TOTAL_RECEIVED + (collectedAfterCutoff._sum.paidAmount ?? 0);
+    const remaining = totalReceived - totalExpenses;
+    return { totalReceived, totalExpenses, remaining };
   }
 
   async bulkSendEmails(apartmentId: string, month: number, year: number): Promise<{ sent: string[]; skipped: string[]; failed: string[] }> {
