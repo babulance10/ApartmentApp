@@ -239,52 +239,95 @@ export class BillsService {
     return { total: bills.length, fixed };
   }
 
+  /**
+   * Finances are reported as a verified opening balance at the 31 Mar 2026
+   * cut-over, plus two separately tracked accounts from 1 Apr 2026 onwards.
+   *
+   * Why the cut-over: before 2026 a paid water bill was only ticked off as
+   * "paid" - the amount was never written down, only outstanding amounts were.
+   * So pre-cut-over water collections look near-zero in the data even though
+   * the money was collected, and any water/maintenance split across that
+   * period would be fiction. Everything up to 31 Mar 2026 is therefore sealed
+   * into a single opening balance (reconciled line-by-line against the
+   * historical "Primark Spend amount" workbook), and only the period from
+   * Apr 2026 - where payments are captured properly - is split out.
+   */
   async getAllTimeTotals(apartmentId: string) {
-    // Authoritative total from Spend Details sheet, covering collections up to
-    // and including March 2026 (Jun 2020 – Mar 2026). This figure is frozen by
-    // design, so anything collected after that cutoff must be added on top -
-    // otherwise "Total Received" (and the Remaining Balance derived from it)
-    // would never grow past March 2026 no matter how much gets collected later.
-    const SPEND_DETAILS_TOTAL_RECEIVED = 1651504;
+    // Collections Jun 2020 - Mar 2026, per the historical workbook (its
+    // =SUM(B1:B70) grand total). Verified to reconcile with that sheet.
+    const OPENING_RECEIVED = 1651504;
     const CUTOFF_MONTH = 3;
     const CUTOFF_YEAR = 2026;
+
+    const beforeCutoff = {
+      OR: [{ year: { lt: CUTOFF_YEAR } }, { year: CUTOFF_YEAR, month: { lte: CUTOFF_MONTH } }],
+    };
+    const afterCutoff = {
+      OR: [{ year: { gt: CUTOFF_YEAR } }, { year: CUTOFF_YEAR, month: { gt: CUTOFF_MONTH } }],
+    };
+    // Tanker spend is mirrored into Expense as "[Auto-Water]" rows purely for
+    // display; WaterPurchase is the authoritative ledger, so the mirrors are
+    // excluded everywhere to avoid counting the same money twice.
+    const realExpense = { apartmentId, NOT: { description: { contains: '[Auto-Water]' } } };
 
     const flats = await this.prisma.flat.findMany({ where: { apartmentId }, select: { id: true } });
     const flatIds = flats.map(f => f.id);
 
-    // Water tanker purchases (WaterPurchase) are the authoritative source for
-    // that spend. Each month's bill generation *also* auto-creates a mirror
-    // Expense row tagged "[Auto-Water]" for display on the Expenses page, but
-    // that side-effect has occasionally failed to fire (e.g. it silently
-    // missed Mar/Apr 2026), which would under-count real spending if we only
-    // looked at Expense. So we sum Expense and WaterPurchase separately and
-    // exclude the "[Auto-Water]" mirror rows from the Expense side, to avoid
-    // ever double-counting the same purchase while never silently missing one.
-    const [expensesResult, waterPurchasesResult, collectedAfterCutoff] = await Promise.all([
-      this.prisma.expense.aggregate({
-        where: { apartmentId, NOT: { description: { contains: '[Auto-Water]' } } },
-        _sum: { amount: true },
-      }),
-      this.prisma.waterPurchase.aggregate({
-        where: { apartmentId },
-        _sum: { amountPaid: true },
-      }),
-      this.prisma.monthlyBill.aggregate({
-        where: {
-          flatId: { in: flatIds },
-          OR: [
-            { year: { gt: CUTOFF_YEAR } },
-            { year: CUTOFF_YEAR, month: { gt: CUTOFF_MONTH } },
-          ],
-        },
-        _sum: { paidAmount: true },
+    const [
+      openingNonWater, openingWaterBills, openingTankers,
+      postNonWater, postWaterBills, postTankers,
+      postBills,
+    ] = await Promise.all([
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: { not: 'Water' }, ...beforeCutoff }, _sum: { amount: true } }),
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: 'Water', ...beforeCutoff }, _sum: { amount: true } }),
+      this.prisma.waterPurchase.aggregate({ where: { apartmentId, ...beforeCutoff }, _sum: { amountPaid: true } }),
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: { not: 'Water' }, ...afterCutoff }, _sum: { amount: true } }),
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: 'Water', ...afterCutoff }, _sum: { amount: true } }),
+      this.prisma.waterPurchase.aggregate({ where: { apartmentId, ...afterCutoff }, _sum: { amountPaid: true } }),
+      this.prisma.monthlyBill.findMany({
+        where: { flatId: { in: flatIds }, ...afterCutoff },
+        select: { waterAmount: true, totalAmount: true, paidAmount: true },
       }),
     ]);
 
-    const totalExpenses = (expensesResult._sum.amount ?? 0) + (waterPurchasesResult._sum.amountPaid ?? 0);
-    const totalReceived = SPEND_DETAILS_TOTAL_RECEIVED + (collectedAfterCutoff._sum.paidAmount ?? 0);
-    const remaining = totalReceived - totalExpenses;
-    return { totalReceived, totalExpenses, remaining };
+    const n = (v: number | null | undefined) => v ?? 0;
+
+    const openingSpent = n(openingNonWater._sum.amount) + n(openingWaterBills._sum.amount) + n(openingTankers._sum.amountPaid);
+    const openingBalance = OPENING_RECEIVED - openingSpent;
+
+    // A payment settles a bill as a whole, so attribute it across that bill's
+    // water and non-water portions in the same proportion it was billed.
+    let collected = 0;
+    let waterCollected = 0;
+    for (const b of postBills) {
+      collected += b.paidAmount;
+      if (b.totalAmount > 0 && b.waterAmount > 0) {
+        waterCollected += b.paidAmount * (b.waterAmount / b.totalAmount);
+      }
+    }
+    const maintenanceCollected = collected - waterCollected;
+
+    const waterSpent = n(postWaterBills._sum.amount) + n(postTankers._sum.amountPaid);
+    const maintenanceSpent = n(postNonWater._sum.amount);
+
+    const totalReceived = OPENING_RECEIVED + collected;
+    const totalExpenses = openingSpent + waterSpent + maintenanceSpent;
+
+    return {
+      cutoff: { month: CUTOFF_MONTH, year: CUTOFF_YEAR },
+      openingReceived: OPENING_RECEIVED,
+      openingSpent,
+      openingBalance,
+      maintenanceCollected,
+      maintenanceSpent,
+      maintenanceBalance: maintenanceCollected - maintenanceSpent,
+      waterCollected,
+      waterSpent,
+      waterBalance: waterCollected - waterSpent,
+      totalReceived,
+      totalExpenses,
+      remaining: totalReceived - totalExpenses,
+    };
   }
 
   async bulkSendEmails(apartmentId: string, month: number, year: number): Promise<{ sent: string[]; skipped: string[]; failed: string[] }> {

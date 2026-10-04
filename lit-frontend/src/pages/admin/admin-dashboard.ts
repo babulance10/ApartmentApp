@@ -1,6 +1,6 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { iconReceipt, iconTrendingUp, iconTrendingDown, iconAlertCircle, iconCheckCircle, iconWallet, iconPiggyBank } from '../../lib/icons.js';
+import { iconReceipt, iconTrendingUp, iconTrendingDown, iconAlertCircle, iconCheckCircle, iconWallet, iconPiggyBank, iconDroplets } from '../../lib/icons.js';
 import { formatCurrency, monthName, currentMonthYear, MONTHS } from '../../lib/utils.js';
 import api from '../../lib/api.js';
 
@@ -56,6 +56,19 @@ export class AdminDashboard extends LitElement {
     const totalExpensesAllTime = this.allTimeTotals?.totalExpenses ?? 0;
     const remaining = totalReceived - totalExpensesAllTime;
 
+    // Finances are split at the 31 Mar 2026 cut-over: everything before it is a
+    // single verified opening balance, because paid water bills were not
+    // recorded as amounts back then and could not be split reliably.
+    const t = this.allTimeTotals;
+    const openingBalance = t?.openingBalance ?? 0;
+    const maintenanceCollected = t?.maintenanceCollected ?? 0;
+    const maintenanceSpent = t?.maintenanceSpent ?? 0;
+    const maintenanceBalance = t?.maintenanceBalance ?? 0;
+    const waterCollected = t?.waterCollected ?? 0;
+    const waterSpent = t?.waterSpent ?? 0;
+    const waterBalance = t?.waterBalance ?? 0;
+    const cutoffLabel = t?.cutoff ? `${monthName(t.cutoff.month)} ${t.cutoff.year}` : 'cut-over';
+
     const stats = [
       { label: 'Total Due', value: formatCurrency(due), icon: iconReceipt, color: 'bg-blue-500', sub: `${monthName(this.month)} ${this.year}` },
       { label: 'Collected', value: formatCurrency(collected), icon: iconTrendingUp, color: 'bg-green-500', sub: `${paidFlats}/${totalFlats} flats paid` },
@@ -82,28 +95,61 @@ export class AdminDashboard extends LitElement {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div class="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl px-5 py-4">
-            <div class="w-11 h-11 bg-indigo-500 rounded-xl flex items-center justify-center flex-shrink-0">
-              ${iconWallet('w-5 h-5 text-white')}
-            </div>
-            <div>
-              <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Total Received (All Time)</p>
-              <p class="text-2xl font-bold text-indigo-700">${this.loading ? '...' : formatCurrency(totalReceived)}</p>
-              <p class="text-xs text-indigo-400">Since inception</p>
-            </div>
-          </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
           <div class="flex items-center gap-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 rounded-xl px-5 py-4">
             <div class="w-11 h-11 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
               ${iconPiggyBank('w-5 h-5 text-white')}
             </div>
-            <div>
-              <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wide">Remaining Balance</p>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold text-emerald-500 uppercase tracking-wide">Total Balance</p>
               <p class="text-2xl font-bold text-emerald-700">${this.loading ? '...' : formatCurrency(remaining)}</p>
-              <p class="text-xs text-emerald-400">After all expenses</p>
+              <p class="text-xs text-emerald-500">
+                ${this.loading ? 'Funds in hand' : html`Opening ${formatCurrency(openingBalance)} + since ${cutoffLabel}`}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl px-5 py-4">
+            <div class="w-11 h-11 bg-indigo-500 rounded-xl flex items-center justify-center flex-shrink-0">
+              ${iconWallet('w-5 h-5 text-white')}
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Maintenance · since ${cutoffLabel}</p>
+              <p class="text-2xl font-bold ${maintenanceBalance < 0 ? 'text-red-600' : 'text-indigo-700'}">
+                ${this.loading ? '...' : (maintenanceBalance < 0 ? '-' : '+') + formatCurrency(Math.abs(maintenanceBalance))}
+              </p>
+              <p class="text-xs text-indigo-400">
+                ${this.loading ? '' : html`In ${formatCurrency(maintenanceCollected)} · Out ${formatCurrency(maintenanceSpent)}`}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4 bg-gradient-to-r ${waterBalance < 0 ? 'from-red-50 to-orange-50 border-red-100' : 'from-cyan-50 to-sky-50 border-cyan-100'} border rounded-xl px-5 py-4">
+            <div class="w-11 h-11 ${waterBalance < 0 ? 'bg-red-500' : 'bg-cyan-500'} rounded-xl flex items-center justify-center flex-shrink-0">
+              ${iconDroplets('w-5 h-5 text-white')}
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-semibold ${waterBalance < 0 ? 'text-red-400' : 'text-cyan-500'} uppercase tracking-wide">Water · since ${cutoffLabel}</p>
+              <p class="text-2xl font-bold ${waterBalance < 0 ? 'text-red-600' : 'text-cyan-700'}">
+                ${this.loading ? '...' : (waterBalance < 0 ? '-' : '+') + formatCurrency(Math.abs(waterBalance))}
+              </p>
+              <p class="text-xs ${waterBalance < 0 ? 'text-red-400' : 'text-cyan-500'}">
+                ${this.loading ? '' : html`In ${formatCurrency(waterCollected)} · Out ${formatCurrency(waterSpent)}`}
+              </p>
             </div>
           </div>
         </div>
+
+        ${!this.loading && waterBalance < 0 ? html`
+          <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+            <span class="text-amber-500">⚠</span>
+            <p class="text-xs text-amber-700">
+              Water is running a shortfall of <span class="font-semibold">${formatCurrency(Math.abs(waterBalance))}</span>
+              since ${cutoffLabel} — tankers and water bills are costing more than is being collected from flats,
+              so the maintenance fund is covering the difference.
+            </p>
+          </div>
+        ` : ''}
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           ${stats.map(({ label, value, icon, color, sub }) => html`
