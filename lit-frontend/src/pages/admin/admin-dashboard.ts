@@ -86,7 +86,10 @@ export class AdminDashboard extends LitElement {
           <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p class="text-gray-500 text-sm mt-1">${monthName(this.month)} ${this.year} Overview</p>
+              <p class="text-gray-500 text-sm mt-1">
+                ${monthName(this.month)} ${this.year} Overview
+                <span class="text-gray-300 text-xs ml-2" title="Build currently loaded in this browser">build ${__BUILD_TIME__}</span>
+              </p>
             </div>
             <div class="flex gap-2">
               <psa-select .value=${String(this.month)} @value-changed=${(e: CustomEvent) => this.month = +e.detail}>
