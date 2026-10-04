@@ -251,20 +251,35 @@ export class BillsService {
    * into a single opening balance (reconciled line-by-line against the
    * historical "Primark Spend amount" workbook), and only the period from
    * Apr 2026 - where payments are captured properly - is split out.
+   *
+   * Passing month/year reports the position *as at the end of that month*, so
+   * the dashboard's period picker moves these figures instead of always
+   * showing the all-time total. Months on or before the cut-over cannot be
+   * broken down (the opening figure is a single lump sum for Jun 2020 -
+   * Mar 2026), so those report the opening balance with beforeCutoff set.
    */
-  async getAllTimeTotals(apartmentId: string) {
+  async getAllTimeTotals(apartmentId: string, upToMonth?: number, upToYear?: number) {
     // Collections Jun 2020 - Mar 2026, per the historical workbook (its
     // =SUM(B1:B70) grand total). Verified to reconcile with that sheet.
     const OPENING_RECEIVED = 1651504;
     const CUTOFF_MONTH = 3;
     const CUTOFF_YEAR = 2026;
 
-    const beforeCutoff = {
+    const hasUpTo = !!upToMonth && !!upToYear;
+    const beforeCutoff =
+      hasUpTo && (upToYear! < CUTOFF_YEAR || (upToYear === CUTOFF_YEAR && upToMonth! <= CUTOFF_MONTH));
+
+    const upToCond = { OR: [{ year: { lt: upToYear } }, { year: upToYear, month: { lte: upToMonth } }] };
+    const beforeCutoffCond = {
       OR: [{ year: { lt: CUTOFF_YEAR } }, { year: CUTOFF_YEAR, month: { lte: CUTOFF_MONTH } }],
     };
-    const afterCutoff = {
+    const afterCutoffCond = {
       OR: [{ year: { gt: CUTOFF_YEAR } }, { year: CUTOFF_YEAR, month: { gt: CUTOFF_MONTH } }],
     };
+    // Window for the tracked period: after the cut-over, and (when a period is
+    // selected) no later than the selected month.
+    const trackedWindow: any = hasUpTo ? { AND: [afterCutoffCond, upToCond] } : afterCutoffCond;
+
     // Tanker spend is mirrored into Expense as "[Auto-Water]" rows purely for
     // display; WaterPurchase is the authoritative ledger, so the mirrors are
     // excluded everywhere to avoid counting the same money twice.
@@ -278,14 +293,14 @@ export class BillsService {
       postNonWater, postWaterBills, postTankers,
       postBills,
     ] = await Promise.all([
-      this.prisma.expense.aggregate({ where: { ...realExpense, category: { not: 'Water' }, ...beforeCutoff }, _sum: { amount: true } }),
-      this.prisma.expense.aggregate({ where: { ...realExpense, category: 'Water', ...beforeCutoff }, _sum: { amount: true } }),
-      this.prisma.waterPurchase.aggregate({ where: { apartmentId, ...beforeCutoff }, _sum: { amountPaid: true } }),
-      this.prisma.expense.aggregate({ where: { ...realExpense, category: { not: 'Water' }, ...afterCutoff }, _sum: { amount: true } }),
-      this.prisma.expense.aggregate({ where: { ...realExpense, category: 'Water', ...afterCutoff }, _sum: { amount: true } }),
-      this.prisma.waterPurchase.aggregate({ where: { apartmentId, ...afterCutoff }, _sum: { amountPaid: true } }),
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: { not: 'Water' }, ...beforeCutoffCond }, _sum: { amount: true } }),
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: 'Water', ...beforeCutoffCond }, _sum: { amount: true } }),
+      this.prisma.waterPurchase.aggregate({ where: { apartmentId, ...beforeCutoffCond }, _sum: { amountPaid: true } }),
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: { not: 'Water' }, ...trackedWindow }, _sum: { amount: true } }),
+      this.prisma.expense.aggregate({ where: { ...realExpense, category: 'Water', ...trackedWindow }, _sum: { amount: true } }),
+      this.prisma.waterPurchase.aggregate({ where: { apartmentId, ...trackedWindow }, _sum: { amountPaid: true } }),
       this.prisma.monthlyBill.findMany({
-        where: { flatId: { in: flatIds }, ...afterCutoff },
+        where: { flatId: { in: flatIds }, ...trackedWindow },
         select: { waterAmount: true, totalAmount: true, paidAmount: true },
       }),
     ]);
@@ -299,22 +314,26 @@ export class BillsService {
     // water and non-water portions in the same proportion it was billed.
     let collected = 0;
     let waterCollected = 0;
-    for (const b of postBills) {
-      collected += b.paidAmount;
-      if (b.totalAmount > 0 && b.waterAmount > 0) {
-        waterCollected += b.paidAmount * (b.waterAmount / b.totalAmount);
+    if (!beforeCutoff) {
+      for (const b of postBills) {
+        collected += b.paidAmount;
+        if (b.totalAmount > 0 && b.waterAmount > 0) {
+          waterCollected += b.paidAmount * (b.waterAmount / b.totalAmount);
+        }
       }
     }
     const maintenanceCollected = collected - waterCollected;
 
-    const waterSpent = n(postWaterBills._sum.amount) + n(postTankers._sum.amountPaid);
-    const maintenanceSpent = n(postNonWater._sum.amount);
+    const waterSpent = beforeCutoff ? 0 : n(postWaterBills._sum.amount) + n(postTankers._sum.amountPaid);
+    const maintenanceSpent = beforeCutoff ? 0 : n(postNonWater._sum.amount);
 
     const totalReceived = OPENING_RECEIVED + collected;
     const totalExpenses = openingSpent + waterSpent + maintenanceSpent;
 
     return {
       cutoff: { month: CUTOFF_MONTH, year: CUTOFF_YEAR },
+      asOf: hasUpTo ? { month: upToMonth, year: upToYear } : null,
+      beforeCutoff,
       openingReceived: OPENING_RECEIVED,
       openingSpent,
       openingBalance,

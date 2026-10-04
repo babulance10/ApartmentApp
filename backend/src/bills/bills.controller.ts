@@ -63,8 +63,12 @@ export class BillsController {
   }
 
   @Get('all-time-totals')
-  getAllTimeTotals(@Query('apartmentId') apartmentId: string) {
-    return this.billsService.getAllTimeTotals(apartmentId);
+  getAllTimeTotals(
+    @Query('apartmentId') apartmentId: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    return this.billsService.getAllTimeTotals(apartmentId, month ? +month : undefined, year ? +year : undefined);
   }
 
   @Get('summary')

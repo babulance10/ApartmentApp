@@ -35,7 +35,7 @@ export class AdminDashboard extends LitElement {
         api.get(`/bills/summary?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`),
         api.get(`/expenses?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`),
         api.get(`/maintenance?status=OPEN`),
-        api.get(`/bills/all-time-totals?apartmentId=${APARTMENT_ID}`),
+        api.get(`/bills/all-time-totals?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`),
       ]);
       this.summary = s.data;
       this.expenses = e.data;
@@ -68,6 +68,10 @@ export class AdminDashboard extends LitElement {
     const waterSpent = t?.waterSpent ?? 0;
     const waterBalance = t?.waterBalance ?? 0;
     const cutoffLabel = t?.cutoff ? `${monthName(t.cutoff.month)} ${t.cutoff.year}` : 'cut-over';
+    // Figures are cumulative up to the end of the selected month, so the period
+    // picker moves them. Periods on/before the cut-over have no breakdown.
+    const asOfLabel = `${monthName(this.month)} ${this.year}`;
+    const beforeCutoff = t?.beforeCutoff ?? false;
 
     const stats = [
       { label: 'Total Due', value: formatCurrency(due), icon: iconReceipt, color: 'bg-blue-500', sub: `${monthName(this.month)} ${this.year}` },
@@ -101,10 +105,12 @@ export class AdminDashboard extends LitElement {
               ${iconPiggyBank('w-5 h-5 text-white')}
             </div>
             <div class="min-w-0">
-              <p class="text-xs font-semibold text-emerald-500 uppercase tracking-wide">Total Balance</p>
+              <p class="text-xs font-semibold text-emerald-500 uppercase tracking-wide">Total Balance · end of ${asOfLabel}</p>
               <p class="text-2xl font-bold text-emerald-700">${this.loading ? '...' : formatCurrency(remaining)}</p>
               <p class="text-xs text-emerald-500">
-                ${this.loading ? 'Funds in hand' : html`Opening ${formatCurrency(openingBalance)} + since ${cutoffLabel}`}
+                ${this.loading ? 'Funds in hand'
+                  : beforeCutoff ? html`Position at the ${cutoffLabel} cut-over`
+                  : html`Opening ${formatCurrency(openingBalance)} + activity since ${cutoffLabel}`}
               </p>
             </div>
           </div>
@@ -114,12 +120,12 @@ export class AdminDashboard extends LitElement {
               ${iconWallet('w-5 h-5 text-white')}
             </div>
             <div class="min-w-0">
-              <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Maintenance · since ${cutoffLabel}</p>
-              <p class="text-2xl font-bold ${maintenanceBalance < 0 ? 'text-red-600' : 'text-indigo-700'}">
-                ${this.loading ? '...' : (maintenanceBalance < 0 ? '-' : '+') + formatCurrency(Math.abs(maintenanceBalance))}
+              <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Maintenance · to ${asOfLabel}</p>
+              <p class="text-2xl font-bold ${beforeCutoff ? 'text-gray-300' : maintenanceBalance < 0 ? 'text-red-600' : 'text-indigo-700'}">
+                ${this.loading ? '...' : beforeCutoff ? '—' : (maintenanceBalance < 0 ? '-' : '+') + formatCurrency(Math.abs(maintenanceBalance))}
               </p>
               <p class="text-xs text-indigo-400">
-                ${this.loading ? '' : html`In ${formatCurrency(maintenanceCollected)} · Out ${formatCurrency(maintenanceSpent)}`}
+                ${this.loading ? '' : beforeCutoff ? 'Not split before cut-over' : html`In ${formatCurrency(maintenanceCollected)} · Out ${formatCurrency(maintenanceSpent)}`}
               </p>
             </div>
           </div>
@@ -129,18 +135,30 @@ export class AdminDashboard extends LitElement {
               ${iconDroplets('w-5 h-5 text-white')}
             </div>
             <div class="min-w-0">
-              <p class="text-xs font-semibold ${waterBalance < 0 ? 'text-red-400' : 'text-cyan-500'} uppercase tracking-wide">Water · since ${cutoffLabel}</p>
-              <p class="text-2xl font-bold ${waterBalance < 0 ? 'text-red-600' : 'text-cyan-700'}">
-                ${this.loading ? '...' : (waterBalance < 0 ? '-' : '+') + formatCurrency(Math.abs(waterBalance))}
+              <p class="text-xs font-semibold ${waterBalance < 0 ? 'text-red-400' : 'text-cyan-500'} uppercase tracking-wide">Water · to ${asOfLabel}</p>
+              <p class="text-2xl font-bold ${beforeCutoff ? 'text-gray-300' : waterBalance < 0 ? 'text-red-600' : 'text-cyan-700'}">
+                ${this.loading ? '...' : beforeCutoff ? '—' : (waterBalance < 0 ? '-' : '+') + formatCurrency(Math.abs(waterBalance))}
               </p>
               <p class="text-xs ${waterBalance < 0 ? 'text-red-400' : 'text-cyan-500'}">
-                ${this.loading ? '' : html`In ${formatCurrency(waterCollected)} · Out ${formatCurrency(waterSpent)}`}
+                ${this.loading ? '' : beforeCutoff ? 'Not split before cut-over' : html`In ${formatCurrency(waterCollected)} · Out ${formatCurrency(waterSpent)}`}
               </p>
             </div>
           </div>
         </div>
 
-        ${!this.loading && waterBalance < 0 ? html`
+        ${!this.loading && beforeCutoff ? html`
+          <div class="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4">
+            <span class="text-slate-400">ⓘ</span>
+            <p class="text-xs text-slate-600">
+              ${asOfLabel} is on or before the ${cutoffLabel} cut-over. Up to that point paid water bills were
+              recorded only as "paid" without the amount, so maintenance and water cannot be split for this period —
+              it is held as a single verified opening balance of
+              <span class="font-semibold">${formatCurrency(openingBalance)}</span>.
+            </p>
+          </div>
+        ` : ''}
+
+        ${!this.loading && !beforeCutoff && waterBalance < 0 ? html`
           <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
             <span class="text-amber-500">⚠</span>
             <p class="text-xs text-amber-700">
