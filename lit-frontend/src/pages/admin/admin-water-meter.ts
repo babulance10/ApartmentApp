@@ -149,6 +149,10 @@ export class AdminWaterMeter extends LitElement {
   render() {
     const preview = this._previewAmounts();
     const carriedCount = Object.keys(this.prevSource).length;
+    // How long a gap the carried-forward readings span. Billing one skipped
+    // month is routine; billing many at once is not, so say it plainly.
+    const src = Object.values(this.prevSource)[0];
+    const gapMonths = src ? (this.year - src.year) * 12 + (this.month - src.month) : 0;
     return html`
       <div>
         <div class="flex items-center justify-between mb-6">
@@ -180,10 +184,12 @@ export class AdminWaterMeter extends LitElement {
           <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
             <span class="text-amber-500">⚠</span>
             <p class="text-xs text-amber-700">
-              No readings were recorded for the month(s) just before ${monthName(this.month)} ${this.year},
-              so the opening reading for ${carriedCount} flat${carriedCount === 1 ? '' : 's'} has been carried
-              forward from the last month actually read (shown under each value). Consumption therefore covers
-              the whole gap since then — check the figures before saving.
+              Last reading was <span class="font-semibold">${src ? monthName(src.month) + ' ' + src.year : ''}</span>,
+              so these figures cover <span class="font-semibold">${gapMonths} month${gapMonths === 1 ? '' : 's'}</span>
+              of water use, not one. Opening readings for ${carriedCount} flat${carriedCount === 1 ? '' : 's'}
+              were carried forward from then (shown under each value).
+              ${gapMonths > 1 ? html`Bills for ${monthName(this.month)} will therefore be about ${gapMonths}× a normal month.` : ''}
+              Please check before saving.
             </p>
           </div>
         ` : ''}
