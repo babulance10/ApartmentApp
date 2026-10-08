@@ -136,6 +136,38 @@ export class WaterMeterService {
     });
   }
 
+  /**
+   * Latest reading recorded for each flat strictly before the given month.
+   *
+   * Meters are cumulative and are not necessarily read every month - months
+   * where no tanker was bought often get skipped entirely. The opening
+   * reading for a month is therefore the last one actually recorded, which
+   * may be several months back; using "the month immediately before" would
+   * find nothing after a skipped month and silently restart the meter at
+   * zero, wiping out the real consumption.
+   */
+  async getLastReadingsBefore(apartmentId: string, month: number, year: number) {
+    const rows = await this.prisma.waterMeterReading.findMany({
+      where: {
+        flat: { apartmentId },
+        OR: [{ year: { lt: year } }, { year, month: { lt: month } }],
+      },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
+    });
+
+    const latestPerFlat = new Map<string, typeof rows[number]>();
+    for (const r of rows) {
+      if (!latestPerFlat.has(r.flatId)) latestPerFlat.set(r.flatId, r);
+    }
+
+    return [...latestPerFlat.values()].map(r => ({
+      flatId: r.flatId,
+      currentReading: r.currentReading,
+      fromMonth: r.month,
+      fromYear: r.year,
+    }));
+  }
+
   async recalculateAll() {
     try {
       const readings = await this.prisma.waterMeterReading.findMany({

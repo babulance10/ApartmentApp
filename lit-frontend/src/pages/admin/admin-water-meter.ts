@@ -17,6 +17,10 @@ export class AdminWaterMeter extends LitElement {
   @state() private saving = false;
   @state() private recalculating = false;
   @state() private creatingCommon = false;
+  // Which month each flat's opening reading was carried forward from, when it
+  // did not come from the month immediately before (i.e. months were skipped).
+  @state() private prevSource: Record<string, { month: number; year: number }> = {};
+  @state() private tankerCost = 0;
 
   createRenderRoot() { return this; }
   connectedCallback() { super.connectedCallback(); this._loadFlats(); }
@@ -51,25 +55,60 @@ export class AdminWaterMeter extends LitElement {
   private async _loadReadings() {
     this.loading = true;
     try {
-      const { data } = await api.get(`/water-meter/apartment?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`);
+      const [{ data }, purchases] = await Promise.all([
+        api.get(`/water-meter/apartment?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`),
+        api.get(`/water-purchases?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`)
+          .then(r => r.data).catch(() => []),
+      ]);
       this.savedReadings = data;
+      this.tankerCost = (purchases || []).reduce((s: number, p: any) => s + (p.amountPaid || 0), 0);
+
+      // Carry the opening reading forward from the last month actually read,
+      // not just the month before - months with no tanker purchase are often
+      // skipped, and looking only one month back would restart the meter at 0.
+      const prevData = data.length === 0
+        ? await api.get(`/water-meter/last-readings?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`)
+            .then(r => r.data).catch(() => [])
+        : [];
+
+      const init: Record<string, { prev: string; curr: string }> = {};
+      const sources: Record<string, { month: number; year: number }> = {};
       let prevMonth = this.month - 1, prevYear = this.year;
       if (prevMonth === 0) { prevMonth = 12; prevYear--; }
-      const prevData = data.length === 0
-        ? await api.get(`/water-meter/apartment?apartmentId=${APARTMENT_ID}&month=${prevMonth}&year=${prevYear}`).then(r => r.data).catch(() => [])
-        : [];
-      const init: Record<string, { prev: string; curr: string }> = {};
+
       this.flats.forEach((f: any) => {
         const found = data.find((r: any) => r.flatId === f.id);
-        if (found) { init[f.id] = { prev: String(found.previousReading), curr: String(found.currentReading) }; }
-        else {
-          const prevReading = prevData.find((r: any) => r.flatId === f.id);
-          init[f.id] = { prev: prevReading ? String(prevReading.currentReading) : '', curr: '' };
+        if (found) { init[f.id] = { prev: String(found.previousReading), curr: String(found.currentReading) }; return; }
+        const prevReading = prevData.find((r: any) => r.flatId === f.id);
+        init[f.id] = { prev: prevReading ? String(prevReading.currentReading) : '', curr: '' };
+        if (prevReading && !(prevReading.fromMonth === prevMonth && prevReading.fromYear === prevYear)) {
+          sources[f.id] = { month: prevReading.fromMonth, year: prevReading.fromYear };
         }
       });
       this.readings = init;
+      this.prevSource = sources;
     } catch {}
     this.loading = false;
+  }
+
+  /** Live preview of each flat's share before anything is saved. */
+  private _previewAmounts() {
+    const consumed: Record<string, number> = {};
+    let total = 0;
+    for (const f of this.flats) {
+      const p = parseFloat(this.readings[f.id]?.prev || '') || 0;
+      const c = parseFloat(this.readings[f.id]?.curr || '') || 0;
+      const used = c > p ? c - p : 0;
+      consumed[f.id] = used;
+      total += used;
+    }
+    const amounts: Record<string, number> = {};
+    for (const f of this.flats) {
+      amounts[f.id] = this.tankerCost > 0 && total > 0
+        ? Math.round((consumed[f.id] / total) * this.tankerCost)
+        : Math.round(consumed[f.id] * 0.088);
+    }
+    return { consumed, amounts, total };
   }
 
   updated(changed: Map<string, any>) {
@@ -108,12 +147,18 @@ export class AdminWaterMeter extends LitElement {
   private _years = [2024, 2025, 2026, 2027];
 
   render() {
+    const preview = this._previewAmounts();
+    const carriedCount = Object.keys(this.prevSource).length;
     return html`
       <div>
         <div class="flex items-center justify-between mb-6">
           <div>
             <h1 class="text-2xl font-bold text-gray-900">Water Meter Readings</h1>
-            <p class="text-gray-500 text-sm mt-1">Rate calculated from tanker purchases</p>
+            <p class="text-gray-500 text-sm mt-1">
+              ${this.tankerCost > 0
+                ? html`Rate calculated from ${formatCurrency(this.tankerCost)} of tanker purchases`
+                : 'No tanker purchased this month — showing fallback rate of ₹0.088/L'}
+            </p>
           </div>
           <div class="flex gap-2">
             ${!this.flats.find((f: any) => f.flatNumber === 'Common') ? html`
@@ -131,6 +176,18 @@ export class AdminWaterMeter extends LitElement {
             ${this._years.map(y => html`<option value=${y}>${y}</option>`)}
           </psa-select>
         </div>
+        ${!this.loading && carriedCount > 0 ? html`
+          <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+            <span class="text-amber-500">⚠</span>
+            <p class="text-xs text-amber-700">
+              No readings were recorded for the month(s) just before ${monthName(this.month)} ${this.year},
+              so the opening reading for ${carriedCount} flat${carriedCount === 1 ? '' : 's'} has been carried
+              forward from the last month actually read (shown under each value). Consumption therefore covers
+              the whole gap since then — check the figures before saving.
+            </p>
+          </div>
+        ` : ''}
+
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -145,7 +202,10 @@ export class AdminWaterMeter extends LitElement {
                       const curr = parseFloat(this.readings[flat.id]?.curr || '0') || 0;
                       const consumed = curr > prev ? curr - prev : 0;
                       const savedReading = this.savedReadings.find((r: any) => r.flatId === flat.id);
-                      const amount = savedReading ? savedReading.waterAmount : 0;
+                      // Show the saved figure once stored, otherwise a live
+                      // preview so the column is not a flat Rs 0 while typing.
+                      const amount = savedReading ? savedReading.waterAmount : preview.amounts[flat.id] ?? 0;
+                      const carried = this.prevSource[flat.id];
                       return html`
                         <tr class="hover:bg-gray-50">
                           <td class="px-4 py-3 font-medium text-gray-900">
@@ -154,13 +214,16 @@ export class AdminWaterMeter extends LitElement {
                           <td class="px-4 py-2">
                             <input type="number" .value=${this.readings[flat.id]?.prev || ''} @input=${(e: Event) => this._updateReading(flat.id, 'prev', (e.target as HTMLInputElement).value)}
                               class="w-32 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                            ${carried ? html`<p class="text-[11px] text-amber-600 mt-0.5">carried from ${monthName(carried.month)} ${carried.year}</p>` : ''}
                           </td>
                           <td class="px-4 py-2">
                             <input type="number" .value=${this.readings[flat.id]?.curr || ''} @input=${(e: Event) => this._updateReading(flat.id, 'curr', (e.target as HTMLInputElement).value)}
                               class="w-32 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
                           </td>
                           <td class="px-4 py-3 text-gray-700">${consumed.toLocaleString('en-IN')}</td>
-                          <td class="px-4 py-3 font-medium text-gray-900">${formatCurrency(amount)}</td>
+                          <td class="px-4 py-3 font-medium ${savedReading ? 'text-gray-900' : 'text-gray-400'}">
+                            ${formatCurrency(amount)}${savedReading ? '' : html`<span class="text-[11px] ml-1">est.</span>`}
+                          </td>
                         </tr>
                       `;
                     })}

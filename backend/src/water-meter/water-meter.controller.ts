@@ -25,6 +25,12 @@ export class WaterMeterAuthController {
     return this.waterMeterService.getByApartment(apartmentId, +month, +year);
   }
 
+  // Must stay above @Get(':id'), otherwise "last-readings" is captured as an id.
+  @Get('last-readings')
+  getLastReadingsBefore(@Query('apartmentId') apartmentId: string, @Query('month') month: string, @Query('year') year: string) {
+    return this.waterMeterService.getLastReadingsBefore(apartmentId, +month, +year);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) { return this.waterMeterService.findOne(id); }
 
