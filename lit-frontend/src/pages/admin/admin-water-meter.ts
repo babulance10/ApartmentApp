@@ -55,21 +55,18 @@ export class AdminWaterMeter extends LitElement {
   private async _loadReadings() {
     this.loading = true;
     try {
-      const [{ data }, purchases] = await Promise.all([
+      // Carry-forward is always fetched, not only when the month is empty:
+      // after a partial save some flats have rows and some do not, and the
+      // ones that do not still need an opening reading.
+      const [{ data }, purchases, prevData] = await Promise.all([
         api.get(`/water-meter/apartment?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`),
         api.get(`/water-purchases?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`)
+          .then(r => r.data).catch(() => []),
+        api.get(`/water-meter/last-readings?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`)
           .then(r => r.data).catch(() => []),
       ]);
       this.savedReadings = data;
       this.tankerCost = (purchases || []).reduce((s: number, p: any) => s + (p.amountPaid || 0), 0);
-
-      // Carry the opening reading forward from the last month actually read,
-      // not just the month before - months with no tanker purchase are often
-      // skipped, and looking only one month back would restart the meter at 0.
-      const prevData = data.length === 0
-        ? await api.get(`/water-meter/last-readings?apartmentId=${APARTMENT_ID}&month=${this.month}&year=${this.year}`)
-            .then(r => r.data).catch(() => [])
-        : [];
 
       const init: Record<string, { prev: string; curr: string }> = {};
       const sources: Record<string, { month: number; year: number }> = {};
@@ -118,11 +115,38 @@ export class AdminWaterMeter extends LitElement {
   }
 
   private async _handleSave() {
+    const filled = (v: any) => String(v ?? '').trim() !== '';
+    const complete: any[] = [];
+    const incomplete: string[] = [];
+    this.flats.forEach((f: any) => {
+      const r = this.readings[f.id] || { prev: '', curr: '' };
+      if (filled(r.prev) && filled(r.curr)) {
+        complete.push({ flatId: f.id, month: this.month, year: this.year, previousReading: parseFloat(r.prev), currentReading: parseFloat(r.curr) });
+      } else if (filled(r.prev) || filled(r.curr)) {
+        incomplete.push(f.flatNumber);
+      }
+    });
+
+    if (complete.length === 0) {
+      alert('Nothing saved.\n\nA reading needs BOTH a previous and a current value. Fill in the Curr Reading column too, then save.');
+      return;
+    }
+
     this.saving = true;
-    const readingsList = this.flats
-      .filter(f => this.readings[f.id]?.prev !== '' && this.readings[f.id]?.curr !== '')
-      .map(f => ({ flatId: f.id, month: this.month, year: this.year, previousReading: parseFloat(this.readings[f.id].prev), currentReading: parseFloat(this.readings[f.id].curr) }));
-    try { await api.post('/water-meter/bulk', { readings: readingsList }); await this._loadReadings(); alert('Readings saved!'); }
+    try {
+      await api.post('/water-meter/bulk', { readings: complete });
+      // Reloading would otherwise overwrite half-finished rows with the
+      // carried-forward value, making a correction look like it was ignored.
+      const typed = { ...this.readings };
+      await this._loadReadings();
+      const savedIds = new Set(complete.map(c => c.flatId));
+      const merged = { ...this.readings };
+      this.flats.forEach((f: any) => { if (!savedIds.has(f.id)) merged[f.id] = typed[f.id]; });
+      this.readings = merged;
+
+      alert(`Saved ${complete.length} reading${complete.length === 1 ? '' : 's'}.` +
+        (incomplete.length ? `\n\nNot saved — these need a Curr Reading as well:\nFlat ${incomplete.join(', Flat ')}` : ''));
+    }
     catch (e: any) { alert(e.response?.data?.message || 'Error saving readings'); }
     this.saving = false;
   }
