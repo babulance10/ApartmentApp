@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { iconZap, iconMessageCircle, iconEdit2, iconMail, iconSend, iconChevronDown } from '../../lib/icons.js';
 import { formatCurrency, monthName, currentMonthYear, MONTHS } from '../../lib/utils.js';
@@ -301,6 +301,15 @@ export class AdminBills extends LitElement {
     this.saving = false;
   }
 
+  private _paymentInfo(bill: any) {
+    const payments: any[] = [...(bill.payments || [])].sort((a, b) => +new Date(a.paymentDate) - +new Date(b.paymentDate));
+    if (!payments.length) return nothing;
+    return html`${payments.map(p => html`
+      <div class="text-[10px] text-gray-400 leading-tight whitespace-nowrap" title="${p.transactionRef || ''}">
+        ${p.paymentMethod || 'N/A'} · ${new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+      </div>`)}`;
+  }
+
   private _statusColor(s: string) { return s === 'PAID' ? 'bg-green-100 text-green-700' : s === 'PARTIAL' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'; }
   private _years = [2024, 2025, 2026, 2027];
 
@@ -477,7 +486,7 @@ export class AdminBills extends LitElement {
                       <td class="text-right px-2 py-3 font-bold text-gray-900 tabular-nums text-sm">${formatCurrency(bill.totalAmount)}</td>
                       <td class="text-right px-2 py-3 tabular-nums">
                         ${bill.paidAmount > 0
-                          ? html`<span class="text-green-600 font-semibold">${formatCurrency(bill.paidAmount)}</span>`
+                          ? html`<span class="text-green-600 font-semibold">${formatCurrency(bill.paidAmount)}</span>${this._paymentInfo(bill)}`
                           : html`<span class="text-gray-300">—</span>`}
                       </td>
                       <td class="text-right px-2 py-3 tabular-nums">
@@ -575,6 +584,7 @@ export class AdminBills extends LitElement {
                   <div class="px-3 py-2.5 text-center">
                     <p class="text-[10px] text-gray-400 uppercase tracking-wide">Paid</p>
                     <p class="text-sm font-semibold ${bill.paidAmount > 0 ? 'text-green-600' : 'text-gray-300'}">${bill.paidAmount > 0 ? formatCurrency(bill.paidAmount) : '—'}</p>
+                    ${bill.paidAmount > 0 ? this._paymentInfo(bill) : ''}
                   </div>
                   <div class="px-3 py-2.5 text-center">
                     <p class="text-[10px] text-gray-400 uppercase tracking-wide">Balance</p>
